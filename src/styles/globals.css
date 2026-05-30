@@ -1,0 +1,99 @@
+/* #must: Global styles and CSS custom properties for theming */
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-primary: 37 99 235;
+    --color-primary-light: 59 130 246;
+    --color-success: 16 185 129;
+    --color-warning: 245 158 11;
+    --color-danger: 239 68 68;
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 70px;
+    --topbar-height: 64px;
+  }
+
+  .dark {
+    --color-primary: 96 165 250;
+    --color-primary-light: 147 197 253;
+  }
+
+  * {
+    @apply border-gray-200 dark:border-slate-700;
+  }
+
+  body {
+    @apply bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+  }
+
+  /* Remove default input appearance for consistent styling */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-slate-600 rounded-full;
+}
+
+/* React-datepicker overrides for our theme */
+.react-datepicker-wrapper {
+  @apply w-full;
+}
+.react-datepicker__input-container input {
+  @apply w-full;
+}
+
+/* Transition utilities */
+.transition-sidebar {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-slide-out-left {
+  animation: slideOutLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
