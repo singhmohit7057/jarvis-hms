@@ -1,4 +1,4 @@
-// #must: Wrapper connecting react-hook-form Controller to Input/Select/Textarea components
+
 import { Controller, type Control, type FieldValues, type Path, type RegisterOptions } from 'react-hook-form';
 import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
@@ -53,6 +53,7 @@ export function FormField<T extends FieldValues>({
               placeholder={placeholder}
               disabled={disabled}
               {...field}
+              value={field.value !== undefined && field.value !== null ? String(field.value) : ''}
             />
           );
         }

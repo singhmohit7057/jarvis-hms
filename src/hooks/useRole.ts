@@ -1,4 +1,4 @@
-// #must: Role-checking hook — exposes role booleans and hasAccess helper for guard logic
+
 import { useAuthStore } from '@/store/authStore';
 import type { UserRole } from '@/types';
 

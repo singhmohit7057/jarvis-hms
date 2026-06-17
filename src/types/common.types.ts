@@ -1,5 +1,3 @@
-// #must: Shared/common types — pagination, sorting, API responses, activity log
-
 export interface PaginationState {
   pageIndex: number;
   pageSize: number;

@@ -1,4 +1,4 @@
-// #must: Temporary placeholder page — renders title so routing works before real pages are built
+
 import { PageHeader } from '@/components/layout/PageHeader';
 
 interface PlaceholderPageProps {

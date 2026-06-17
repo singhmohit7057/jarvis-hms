@@ -1,5 +1,3 @@
-// #must: Pharmacy module type definitions — medicines, batches, cart, sales, GST
-
 import type { MEDICINE_CATEGORIES, PAYMENT_METHODS, GST_SLABS } from '@/config/constants';
 
 export type MedicineCategory = (typeof MEDICINE_CATEGORIES)[number];
@@ -15,7 +13,10 @@ export interface Medicine {
   composition: string;
   hsnCode: string;
   gstPercentage: GSTPercentage;
-  unit: string;
+  packSize: number;
+  looseSell: boolean;
+  reorderLevel: number;
+  rackLocation: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -40,8 +41,11 @@ export interface CartItem {
   batchNumber: string;
   quantity: number;
   unitPrice: number;
+  packSize: number;
+  looseSell: boolean;
   gstPercentage: GSTPercentage;
   hsnCode: string;
+  expiryDate: string;
   gstAmount: number;
   totalPrice: number;
   maxStock: number;
@@ -61,6 +65,7 @@ export interface Sale {
   patientId?: string;
   customerName: string;
   customerPhone: string;
+  doctorName?: string;
   items: SaleItem[];
   subtotal: number;
   discountType: 'percentage' | 'fixed';
@@ -83,6 +88,7 @@ export interface SaleItem {
   medicineName: string;
   hsnCode: string;
   batchNumber: string;
+  expiryDate: string;
   quantity: number;
   unitPrice: number;
   gstPercentage: GSTPercentage;

@@ -1,48 +1,51 @@
-// #must: Bill summary section showing subtotal, per-slab GST breakdown, discount, and grand total
-import { useState } from 'react';
+
+import { useState, useMemo } from 'react';
 import { Percent, IndianRupee } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
-import { getGSTSlabLabel } from '@/lib/gst';
+import { calculateCartGST } from '@/lib/gst';
 import { cn } from '@/lib/utils';
 import { useCart } from '../hooks/useCart';
 
 export function POSBillSummary() {
-  const subtotal = useCart((s) => s.getSubtotal());
-  const gstBreakdown = useCart((s) => s.getGSTBreakdown());
-  const gstTotal = useCart((s) => s.getGSTTotal());
-  const discountAmount = useCart((s) => s.getDiscountAmount());
-  const grandTotal = useCart((s) => s.getGrandTotal());
+  const items = useCart((s) => s.items);
   const discount = useCart((s) => s.discount);
   const setDiscount = useCart((s) => s.setDiscount);
+
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+    [items]
+  );
+
+  const { gstTotal } = useMemo(
+    () => items.length > 0 ? calculateCartGST(items) : { gstBreakdown: [], gstTotal: 0 },
+    [items]
+  );
+
+  const discountAmount = useMemo(() => {
+    if (discount.type === 'percentage') {
+      return Math.round(subtotal * discount.value / 100 * 100) / 100;
+    }
+    return Math.min(discount.value, subtotal + gstTotal);
+  }, [subtotal, gstTotal, discount]);
+
+  const exactTotal = useMemo(
+    () => subtotal - discountAmount,
+    [subtotal, discountAmount]
+  );
+
+  const grandTotal = useMemo(() => Math.round(exactTotal), [exactTotal]);
+
+  const roundOff = useMemo(() => grandTotal - exactTotal, [grandTotal, exactTotal]);
 
   const [showDiscount, setShowDiscount] = useState(discount.value > 0);
 
   return (
-    <div className="space-y-3 p-4 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+    <div className="space-y-2 p-3 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
       {/* Subtotal */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
         <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(subtotal)}</span>
       </div>
-
-      {/* GST Breakdown */}
-      {gstBreakdown.length > 0 && (
-        <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-slate-700">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">GST Breakdown</p>
-          {gstBreakdown.map((slab) => (
-            <div key={slab.percentage} className="flex items-center justify-between text-xs">
-              <span className="text-gray-600 dark:text-gray-400">
-                {getGSTSlabLabel(slab.percentage)}
-              </span>
-              <span className="text-gray-700 dark:text-gray-300">{formatCurrency(slab.totalGst)}</span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between text-sm pt-1">
-            <span className="text-gray-600 dark:text-gray-400 font-medium">Total GST</span>
-            <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(gstTotal)}</span>
-          </div>
-        </div>
-      )}
 
       {/* Discount */}
       <div className="py-2 border-t border-gray-100 dark:border-slate-700">
@@ -105,6 +108,16 @@ export function POSBillSummary() {
           </div>
         )}
       </div>
+
+      {/* Round Off */}
+      {roundOff !== 0 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500 dark:text-gray-400">Round Off</span>
+          <span className="text-gray-500 dark:text-gray-400">
+            {roundOff > 0 ? '+' : ''}{formatCurrency(roundOff)}
+          </span>
+        </div>
+      )}
 
       {/* Grand Total */}
       <div className="flex items-center justify-between pt-3 border-t-2 border-gray-200 dark:border-slate-600">

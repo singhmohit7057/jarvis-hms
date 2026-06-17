@@ -1,4 +1,4 @@
-// #must: Generate professional lab report PDF using jsPDF — clinic header, patient info, results table, flags
+
 import jsPDF from 'jspdf';
 import { CLINIC_INFO } from '@/config/constants';
 import { formatDate } from '@/lib/formatters';
@@ -7,325 +7,379 @@ import type { LabBooking, Patient, LabReport, LabTest, LabResultEntry } from '@/
 type BookingWithPatient = LabBooking & { patient: Patient };
 type ReportWithTest = LabReport & { test: LabTest };
 
-/**
- * Generates a professional lab diagnostic report PDF.
- * Includes clinic header, patient details, test results with flags, and footer.
- */
 export function generateLabReportPDF(
   booking: BookingWithPatient,
   reports: ReportWithTest[]
 ): jsPDF {
   const doc = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentWidth = pageWidth - margin * 2;
-  let yPos = margin;
+  const PW = doc.internal.pageSize.getWidth();
+  const PH = doc.internal.pageSize.getHeight();
+  const ML = 15;
+  const MR = 15;
+  const CW = PW - ML - MR;
 
-  // Helper: check if we need a new page
-  function checkPageBreak(requiredHeight: number) {
-    if (yPos + requiredHeight > pageHeight - 25) {
-      doc.addPage();
-      yPos = margin;
-      drawPageBorder();
-    }
-  }
+  const patient = booking.patient;
 
-  // Helper: draw page border
-  function drawPageBorder() {
+  // ── helpers ──────────────────────────────────────────────────────────────────
+  function drawBorder() {
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
-    doc.rect(8, 8, pageWidth - 16, pageHeight - 16);
+    doc.rect(8, 8, PW - 16, PH - 16);
   }
 
-  // Helper: draw horizontal line
-  function drawLine(y: number, style: 'solid' | 'dashed' = 'solid') {
+  function drawLine(y: number, dashed = false) {
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.3);
-    if (style === 'dashed') {
-      const dashLength = 2;
-      const gapLength = 1.5;
-      let x = margin;
-      while (x < pageWidth - margin) {
-        const end = Math.min(x + dashLength, pageWidth - margin);
-        doc.line(x, y, end, y);
-        x = end + gapLength;
+    if (dashed) {
+      const dash = 2, gap = 1.5;
+      let x = ML;
+      while (x < PW - MR) {
+        doc.line(x, y, Math.min(x + dash, PW - MR), y);
+        x += dash + gap;
       }
     } else {
-      doc.line(margin, y, pageWidth - margin, y);
+      doc.line(ML, y, PW - MR, y);
     }
   }
 
-  // --- PAGE BORDER ---
-  drawPageBorder();
+  function drawClinicHeader(y: number): number {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(33, 37, 41);
+    doc.text(CLINIC_INFO.name.toUpperCase(), PW / 2, y + 5, { align: 'center' });
+    y += 9;
 
-  // --- CLINIC HEADER ---
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text('DIAGNOSTIC LABORATORY', PW / 2, y + 3, { align: 'center' });
+    y += 7;
+
+    doc.setFontSize(8);
+    doc.text(CLINIC_INFO.address, PW / 2, y + 2, { align: 'center' });
+    y += 5;
+    doc.text(`Phone: ${CLINIC_INFO.phone} | Email: ${CLINIC_INFO.email}`, PW / 2, y + 2, { align: 'center' });
+    y += 6;
+
+    doc.setDrawColor(44, 62, 80);
+    doc.setLineWidth(0.8);
+    doc.line(ML, y, PW - MR, y);
+    y += 2;
+    doc.setDrawColor(52, 152, 219);
+    doc.setLineWidth(0.4);
+    doc.line(ML, y, PW - MR, y);
+    y += 5;
+
+    return y;
+  }
+
+  function drawSmallClinicHeader(y: number): number {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(33, 37, 41);
+    doc.text(CLINIC_INFO.name.toUpperCase(), PW / 2, y + 4, { align: 'center' });
+    y += 7;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `${CLINIC_INFO.address} | Ph: ${CLINIC_INFO.phone}`,
+      PW / 2, y + 2, { align: 'center' }
+    );
+    y += 5;
+
+    doc.setDrawColor(44, 62, 80);
+    doc.setLineWidth(0.5);
+    doc.line(ML, y, PW - MR, y);
+    y += 1;
+    doc.setDrawColor(52, 152, 219);
+    doc.setLineWidth(0.3);
+    doc.line(ML, y, PW - MR, y);
+    y += 4;
+
+    return y;
+  }
+
+  function drawPageFooter(pageLabel: string) {
+    const fy = PH - 18;
+    drawLine(fy);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(
+      'This is a computer-generated report and does not require signature.',
+      PW / 2, fy + 4, { align: 'center' }
+    );
+    doc.text(pageLabel, PW - MR, fy + 4, { align: 'right' });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PAGE 1 — Cover / Summary
+  // ════════════════════════════════════════════════════════════════════════════
+  drawBorder();
+  let y = 15;
+
+  y = drawClinicHeader(y);
+
+  // Report title
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
+  doc.setFontSize(10);
   doc.setTextColor(33, 37, 41);
-  doc.text(CLINIC_INFO.name.toUpperCase(), pageWidth / 2, yPos + 5, { align: 'center' });
-  yPos += 9;
+  doc.text('LABORATORY REPORT', PW / 2, y, { align: 'center' });
+  y += 7;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(100, 100, 100);
-  doc.text('DIAGNOSTIC LABORATORY', pageWidth / 2, yPos + 4, { align: 'center' });
-  yPos += 8;
-
-  doc.setFontSize(8);
-  doc.text(CLINIC_INFO.address, pageWidth / 2, yPos + 3, { align: 'center' });
-  yPos += 5;
-  doc.text(
-    `Phone: ${CLINIC_INFO.phone} | Email: ${CLINIC_INFO.email}`,
-    pageWidth / 2,
-    yPos + 3,
-    { align: 'center' }
-  );
-  yPos += 7;
-
-  // Header separator
-  doc.setDrawColor(44, 62, 80);
-  doc.setLineWidth(0.8);
-  doc.line(margin, yPos, pageWidth - margin, yPos);
-  yPos += 2;
-  doc.setDrawColor(52, 152, 219);
-  doc.setLineWidth(0.4);
-  doc.line(margin, yPos, pageWidth - margin, yPos);
-  yPos += 6;
-
-  // --- REPORT INFO ---
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(33, 37, 41);
-  doc.text('LABORATORY REPORT', pageWidth / 2, yPos, { align: 'center' });
-  yPos += 6;
-
-  // Report number and date row
+  // Booking meta row
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Report No: ${booking.bookingNumber}`, margin, yPos);
-  doc.text(`Date: ${formatDate(new Date().toISOString())}`, pageWidth - margin, yPos, {
-    align: 'right',
-  });
-  yPos += 8;
+  doc.text(`Report No: ${booking.bookingNumber}`, ML, y);
+  doc.text(`Date: ${formatDate(new Date().toISOString())}`, PW - MR, y, { align: 'right' });
+  y += 8;
 
-  // --- PATIENT INFORMATION ---
-  drawLine(yPos);
-  yPos += 5;
+  // ── Patient Information ───────────────────────────────────────────────────
+  drawLine(y);
+  y += 5;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(44, 62, 80);
-  doc.text('PATIENT INFORMATION', margin, yPos);
-  yPos += 6;
+  doc.text('PATIENT INFORMATION', ML, y);
+  y += 6;
 
-  const patient = booking.patient;
-  const patientInfoLeft = [
-    { label: 'Patient Name', value: patient.name },
-    { label: 'Age / Gender', value: `${patient.age} yrs / ${patient.gender}` },
-    { label: 'Patient ID', value: patient.patientId },
+  const leftInfo = [
+    { label: 'Patient Name', value: patient.name ?? '' },
+    { label: 'Age / Gender', value: `${patient.age ?? '--'} yrs / ${patient.gender ?? '--'}` },
+    { label: 'Patient ID', value: patient.patientId ?? '' },
   ];
-  const patientInfoRight = [
-    { label: 'Phone', value: patient.phone },
+  const rightInfo = [
+    { label: 'Phone', value: patient.phone ?? '' },
     { label: 'Booking Date', value: formatDate(booking.createdAt) },
-    { label: 'Collection Date', value: booking.collectedBy ? formatDate(booking.createdAt) : 'N/A' },
+    { label: 'Collected By', value: booking.collectorName ?? booking.collectedBy ?? 'N/A' },
   ];
 
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(33, 37, 41);
-
-  patientInfoLeft.forEach((item, idx) => {
-    const y = yPos + idx * 5;
+  leftInfo.forEach((item, i) => {
+    const iy = y + i * 5.5;
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text(`${item.label}:`, margin, y);
+    doc.text(`${item.label}:`, ML, iy);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(33, 37, 41);
-    doc.text(item.value, margin + 30, y);
+    doc.text(item.value, ML + 32, iy);
   });
 
-  patientInfoRight.forEach((item, idx) => {
-    const y = yPos + idx * 5;
+  rightInfo.forEach((item, i) => {
+    const iy = y + i * 5.5;
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text(`${item.label}:`, pageWidth / 2 + 10, y);
+    doc.text(`${item.label}:`, PW / 2 + 8, iy);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(33, 37, 41);
-    doc.text(item.value, pageWidth / 2 + 40, y);
+    doc.text(item.value, PW / 2 + 42, iy);
   });
 
-  yPos += patientInfoLeft.length * 5 + 4;
-  drawLine(yPos);
-  yPos += 8;
+  y += leftInfo.length * 5.5 + 5;
 
-  // --- TEST RESULTS ---
-  reports.forEach((report, reportIndex) => {
-    const test = report.test;
-    const results = report.results as LabResultEntry[];
+  // ── Tests Summary Table ────────────────────────────────────────────────────
+  drawLine(y);
+  y += 5;
 
-    // Test section header height estimate
-    const sectionHeight = 12 + results.length * 6 + (report.interpretation ? 15 : 0) + 10;
-    checkPageBreak(Math.min(sectionHeight, 80));
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(44, 62, 80);
+  doc.text('TESTS INCLUDED IN THIS REPORT', ML, y);
+  y += 6;
 
-    // Test header
-    doc.setFillColor(240, 244, 248);
-    doc.rect(margin, yPos - 2, contentWidth, 7, 'F');
+  // Table header
+  doc.setFillColor(44, 62, 80);
+  doc.rect(ML, y, CW, 7, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(255, 255, 255);
+  doc.text('#', ML + 3, y + 4.5);
+  doc.text('Test Name', ML + 12, y + 4.5);
+  doc.text('Sample Type', ML + 90, y + 4.5);
+  doc.text('Parameters', ML + 130, y + 4.5);
+  doc.text('Page', PW - MR - 3, y + 4.5, { align: 'right' });
+  y += 7;
+
+  reports.forEach((report, idx) => {
+    const rowH = 7;
+    if (idx % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(ML, y, CW, rowH, 'F');
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(33, 37, 41);
+    doc.text(String(idx + 1), ML + 3, y + 4.5);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.text(report.test.testName, ML + 12, y + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(report.test.sampleType ?? '-', ML + 90, y + 4.5);
+    doc.text(String((report.results as LabResultEntry[]).length), ML + 130, y + 4.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(52, 152, 219);
+    doc.text(String(idx + 2), PW - MR - 3, y + 4.5, { align: 'right' });
+
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.2);
+    doc.line(ML, y + rowH, PW - MR, y + rowH);
+    y += rowH;
+  });
+
+  y += 10;
+
+  // ── Prepared / Verified By ────────────────────────────────────────────────
+  drawLine(y);
+  y += 7;
+
+  const preparedBy = booking.preparedBy;
+  if (preparedBy) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text('Report Prepared By:', ML, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(33, 37, 41);
+    doc.text(String(preparedBy), ML + 36, y);
+    y += 5;
+  }
+  drawPageFooter(`Page 1 of ${reports.length + 1}`);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PAGE PER TEST
+  // ════════════════════════════════════════════════════════════════════════════
+  reports.forEach((report, reportIdx) => {
+    doc.addPage();
+    drawBorder();
+    let py = 12;
+
+    py = drawSmallClinicHeader(py);
+
+    // Page label + test title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
     doc.setTextColor(44, 62, 80);
-    doc.text(test.testName.toUpperCase(), margin + 2, yPos + 3);
+    doc.text(report.test.testName.toUpperCase(), PW / 2, py + 4, { align: 'center' });
+    py += 8;
 
-    // Sample type on the right
+    // Booking ref + sample type
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(7.5);
     doc.setTextColor(100, 100, 100);
+    doc.text(`Booking: ${booking.bookingNumber}`, ML, py);
+    doc.text(`Sample: ${report.test.sampleType ?? ''}`, PW - MR, py, { align: 'right' });
+    py += 4;
+
+    // Patient mini-bar
+    doc.setFillColor(240, 244, 248);
+    doc.rect(ML, py, CW, 7, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(50, 50, 50);
     doc.text(
-      `Sample: ${test.sampleType}`,
-      pageWidth - margin - 2,
-      yPos + 3,
-      { align: 'right' }
+      `${patient.name ?? ''}  |  ${patient.age ?? '--'} yrs / ${patient.gender ?? '--'}  |  ID: ${patient.patientId ?? ''}  |  ${formatDate(booking.createdAt)}`,
+      PW / 2, py + 4.5, { align: 'center' }
     );
-    yPos += 10;
+    py += 11;
 
     // Results table header
     const colX = {
-      parameter: margin + 2,
-      result: margin + 60,
-      unit: margin + 95,
-      reference: margin + 120,
-      flag: pageWidth - margin - 12,
+      parameter: ML + 2,
+      result: ML + 68,
+      unit: ML + 100,
+      reference: ML + 128,
+      flag: PW - MR - 10,
     };
 
+    doc.setFillColor(44, 62, 80);
+    doc.rect(ML, py, CW, 7, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
-    doc.setTextColor(80, 80, 80);
-    doc.text('Parameter', colX.parameter, yPos);
-    doc.text('Result', colX.result, yPos);
-    doc.text('Unit', colX.unit, yPos);
-    doc.text('Reference Range', colX.reference, yPos);
-    doc.text('Flag', colX.flag, yPos);
-    yPos += 2;
+    doc.setTextColor(255, 255, 255);
+    doc.text('Parameter', colX.parameter, py + 4.5);
+    doc.text('Result', colX.result, py + 4.5);
+    doc.text('Unit', colX.unit, py + 4.5);
+    doc.text('Reference Range', colX.reference, py + 4.5);
+    doc.text('Flag', colX.flag, py + 4.5, { align: 'right' });
+    py += 7;
 
-    drawLine(yPos, 'dashed');
-    yPos += 4;
+    const results = report.results as LabResultEntry[];
 
-    // Result rows
-    results.forEach((result) => {
-      checkPageBreak(7);
+    results.forEach((result, ri) => {
+      const rowH = 6.5;
+
+      if (ri % 2 === 0) {
+        doc.setFillColor(250, 251, 252);
+        doc.rect(ML, py, CW, rowH, 'F');
+      }
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(33, 37, 41);
-      doc.text(result.parameter, colX.parameter, yPos);
+      doc.text(result.parameter ?? '', colX.parameter, py + 4);
 
-      // Value - bold if abnormal
-      if (result.flag === 'high' || result.flag === 'low' || result.flag === 'critical') {
+      const isAbnormal = result.flag === 'high' || result.flag === 'low' || result.flag === 'critical';
+      if (isAbnormal) {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(192, 57, 43);
       } else {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(33, 37, 41);
       }
-      doc.text(result.value, colX.result, yPos);
+      doc.text(result.value ?? '', colX.result, py + 4);
 
-      // Unit and reference
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
-      doc.text(result.unit, colX.unit, yPos);
-      doc.text(result.normalRange, colX.reference, yPos);
+      doc.text(result.unit ?? '', colX.unit, py + 4);
+      doc.text(result.normalRange ?? '', colX.reference, py + 4);
 
-      // Flag indicator
-      let flagSymbol = '';
-      if (result.flag === 'high') flagSymbol = 'H *';
-      else if (result.flag === 'low') flagSymbol = 'L ↓';
-      else if (result.flag === 'critical') flagSymbol = 'C **';
-
-      if (flagSymbol) {
+      if (isAbnormal) {
+        const sym = result.flag === 'high' ? 'H ↑' : result.flag === 'low' ? 'L ↓' : 'C !!';
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(192, 57, 43);
-        doc.text(flagSymbol, colX.flag, yPos);
+        doc.text(sym, colX.flag, py + 4, { align: 'right' });
       }
 
-      yPos += 5.5;
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.2);
+      doc.line(ML, py + rowH, PW - MR, py + rowH);
+      py += rowH;
     });
 
-    yPos += 2;
+    py += 6;
 
     // Interpretation
     if (report.interpretation) {
-      checkPageBreak(12);
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(7.5);
-      doc.setTextColor(60, 60, 60);
-      doc.text('Interpretation:', margin + 2, yPos);
-      yPos += 4;
+      doc.setFillColor(255, 253, 235);
+      const interpLines = doc.splitTextToSize(report.interpretation, CW - 8);
+      const interpH = interpLines.length * 4 + 8;
+      doc.rect(ML, py, CW, interpH, 'F');
+      doc.setDrawColor(230, 200, 60);
+      doc.setLineWidth(0.4);
+      doc.line(ML, py, ML, py + interpH);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 80, 0);
+      doc.text('Interpretation:', ML + 4, py + 5);
       doc.setFont('helvetica', 'normal');
-
-      // Word-wrap interpretation text
-      const splitText = doc.splitTextToSize(report.interpretation, contentWidth - 4);
-      splitText.forEach((line: string) => {
-        checkPageBreak(5);
-        doc.text(line, margin + 2, yPos);
-        yPos += 3.5;
-      });
-      yPos += 2;
+      doc.setTextColor(60, 60, 60);
+      doc.text(interpLines, ML + 4, py + 10);
+      py += interpH + 6;
     }
 
-    // Separator between tests
-    if (reportIndex < reports.length - 1) {
-      yPos += 3;
-      drawLine(yPos, 'dashed');
-      yPos += 6;
-    }
+    // Flag legend
+    const ly = PH - 24;
+    doc.setFontSize(7);
+    doc.setTextColor(140, 140, 140);
+    doc.setFont('helvetica', 'normal');
+    doc.text('H ↑ = High    |    L ↓ = Low    |    C !! = Critical', ML, ly);
+
+    drawPageFooter(`Page ${reportIdx + 2} of ${reports.length + 1}`);
   });
-
-  // --- FOOTER SECTION ---
-  yPos += 10;
-  checkPageBreak(35);
-  drawLine(yPos);
-  yPos += 8;
-
-  // Verified by
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(80, 80, 80);
-  doc.text('Verified by:', margin, yPos);
-  yPos += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(33, 37, 41);
-  doc.text(booking.verifiedBy ?? 'Lab Staff', margin, yPos);
-  yPos += 4;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(100, 100, 100);
-  doc.text('Lab Technician', margin, yPos);
-
-  // Flag legend on the right
-  const legendX = pageWidth - margin - 50;
-  doc.setFontSize(7);
-  doc.setTextColor(100, 100, 100);
-  doc.text('H * = High', legendX, yPos - 9);
-  doc.text('L ↓ = Low', legendX, yPos - 5);
-  doc.text('C ** = Critical', legendX, yPos - 1);
-
-  yPos += 10;
-
-  // Footer note
-  drawLine(yPos);
-  yPos += 5;
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(7);
-  doc.setTextColor(120, 120, 120);
-  doc.text(
-    'This is a computer-generated report and does not require signature.',
-    pageWidth / 2,
-    yPos,
-    { align: 'center' }
-  );
-  yPos += 5;
-  doc.text('--- End of Report ---', pageWidth / 2, yPos, { align: 'center' });
 
   return doc;
 }

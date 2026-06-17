@@ -1,6 +1,5 @@
-// #must: Single cart item row with quantity stepper, price info, and remove button
+
 import { Minus, Plus, Trash2 } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/lib/formatters';
 import type { CartItem } from '@/types';
@@ -25,8 +24,13 @@ export function POSCartItem({ item, maxStock, onUpdateQuantity, onRemove }: POSC
     }
   };
 
+  const ps = Math.max(item.packSize ?? 1, 1);
+  const showPieceBreakdown = item.looseSell && ps > 1;
+  const strips = showPieceBreakdown ? Math.floor(item.quantity / ps) : null;
+  const remainder = showPieceBreakdown ? item.quantity % ps : null;
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50">
+    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-slate-700/50">
       {/* Medicine Info */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -36,9 +40,15 @@ export function POSCartItem({ item, maxStock, onUpdateQuantity, onRemove }: POSC
           <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
             {item.batchNumber}
           </span>
-          <Badge variant="info" size="sm">
-            {item.gstPercentage}%
-          </Badge>
+          {showPieceBreakdown && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {strips! > 0 && remainder! > 0
+                ? `${strips} strip + ${remainder} pc`
+                : strips! > 0
+                ? `${strips} strip${strips! > 1 ? 's' : ''}`
+                : `${remainder} pc`}
+            </span>
+          )}
         </div>
       </div>
 
@@ -69,7 +79,7 @@ export function POSCartItem({ item, maxStock, onUpdateQuantity, onRemove }: POSC
           {formatCurrency(item.unitPrice * item.quantity)}
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {formatCurrency(item.unitPrice)} x {item.quantity}
+          {formatCurrency(item.unitPrice)}/{item.looseSell ? 'pc' : 'unit'} × {item.quantity}
         </p>
       </div>
 

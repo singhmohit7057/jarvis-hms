@@ -1,4 +1,4 @@
-// #must: Inventory DataTable with column definitions, row expansion for batches, action buttons
+
 import { useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Edit, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
@@ -60,26 +60,54 @@ export function InventoryTable({ data, isLoading, onEdit, onAddBatch, onDelete }
       cell: ({ row }) => <Badge variant="info">{row.original.category}</Badge>,
     },
     {
-      accessorKey: 'hsnCode',
-      header: 'HSN',
-    },
-    {
       accessorKey: 'company',
       header: 'Company',
+    },
+    {
+      accessorKey: 'hsnCode',
+      header: 'HSN Code',
+      cell: ({ row }) => row.original.hsnCode || '—',
+    },
+    {
+      accessorKey: 'gstPercentage',
+      header: 'GST %',
+      cell: ({ row }) => `${row.original.gstPercentage}%`,
     },
     {
       id: 'totalStock',
       header: 'Total Stock',
       cell: ({ row }) => {
         const total = row.original.batches.reduce((sum, b) => sum + b.quantityInStock, 0);
-        const variant = total === 0 ? 'danger' : total <= 10 ? 'warning' : 'success';
-        return <Badge variant={variant}>{total} {row.original.unit}s</Badge>;
+        const ML_CATS = new Set(['Syrup', 'Drops', 'Injection', 'Inhaler']);
+        const isLiquid = ML_CATS.has(row.original.category);
+        const ps = Math.max(row.original.packSize, 1);
+        const looseSell = row.original.looseSell;
+
+        let label: string;
+        let stockForThreshold: number;
+
+        if (looseSell) {
+          // stock in pieces; show strips + pieces
+          const containerUnit = 'strips';
+          const pieceUnit = 'pcs';
+          const containers = Math.floor(total / ps);
+          stockForThreshold = containers;
+          label = ps > 1 ? `${containers} ${containerUnit} (${total} ${pieceUnit})` : `${total} pcs`;
+        } else {
+          // stock in whole units (bottles / strips / vials)
+          const containerUnit = isLiquid ? 'bottles' : ps > 1 ? 'strips' : 'units';
+          stockForThreshold = total;
+          label = ps > 1 ? `${total} ${containerUnit} (${total * ps} ${isLiquid ? 'ml' : 'pcs'})` : `${total} ${containerUnit}`;
+        }
+
+        const variant = total === 0 ? 'danger' : stockForThreshold <= row.original.reorderLevel ? 'warning' : 'success';
+        return <Badge variant={variant}>{label}</Badge>;
       },
     },
     {
-      accessorKey: 'gstPercentage',
-      header: 'GST%',
-      cell: ({ row }) => `${row.original.gstPercentage}%`,
+      accessorKey: 'rackLocation',
+      header: 'Rack',
+      cell: ({ row }) => row.original.rackLocation || '—',
     },
     {
       id: 'status',
@@ -92,7 +120,7 @@ export function InventoryTable({ data, isLoading, onEdit, onAddBatch, onDelete }
 
         if (total === 0) return <Badge variant="danger">Out of Stock</Badge>;
         if (hasExpired) return <Badge variant="danger">Has Expired</Badge>;
-        if (total <= 10) return <Badge variant="warning">Low Stock</Badge>;
+        if (total <= row.original.reorderLevel) return <Badge variant="warning">Low Stock</Badge>;
         return <Badge variant="success">In Stock</Badge>;
       },
     },
@@ -152,11 +180,19 @@ export function InventoryTable({ data, isLoading, onEdit, onAddBatch, onDelete }
       />
 
       {/* Expanded batch details */}
-      {expandedId && (
-        <div className="mt-2 ml-8 p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-200 dark:border-slate-700">
-          <BatchDetails medicineId={expandedId} />
-        </div>
-      )}
+      {expandedId && (() => {
+        const med = data.find((m) => m.id === expandedId);
+        return (
+          <div className="mt-2 ml-8 p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-200 dark:border-slate-700">
+            <BatchDetails
+              medicineId={expandedId}
+              packSize={med?.packSize ?? 1}
+              looseSell={med?.looseSell ?? false}
+              category={med?.category ?? ''}
+            />
+          </div>
+        );
+      })()}
 
       {/* Delete confirmation */}
       <ConfirmDialog

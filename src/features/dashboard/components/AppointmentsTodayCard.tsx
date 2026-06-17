@@ -1,5 +1,3 @@
-// #must: Today's appointments timeline card — fetches with patient/doctor names, click to consultation
-
 import { useNavigate } from 'react-router-dom';
 import { Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/Card';

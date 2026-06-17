@@ -1,5 +1,3 @@
-// #must: Receptionist dashboard — registration/appointment/lab stats, quick actions, upcoming appointments
-
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, Calendar, FlaskConical, IndianRupee, Clock } from 'lucide-react';
@@ -159,7 +157,7 @@ export function ReceptionistDashboard() {
               {upcomingAppts.map((appt) => (
                 <li
                   key={appt.id}
-                  onClick={() => navigate(ROUTES.APPOINTMENTS)}
+                  onClick={() => navigate(ROUTES.CONSULTATION.replace(':id', appt.id))}
                   className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/40 cursor-pointer transition-colors"
                 >
                   <div className="w-16 shrink-0 text-center">

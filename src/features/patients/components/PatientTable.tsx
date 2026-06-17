@@ -1,4 +1,4 @@
-// #must: DataTable column definitions for patient list with ID badge and action buttons
+
 import { type ColumnDef } from '@tanstack/react-table';
 import { Eye, Edit2 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
@@ -68,9 +68,9 @@ export function getPatientColumns({ onView, onEdit }: PatientTableActions): Colu
               e.stopPropagation();
               onView(row.original);
             }}
-            aria-label="View patient"
+            leftIcon={<Eye className="h-4 w-4" />}
           >
-            <Eye className="h-4 w-4" />
+            View
           </Button>
           <Button
             variant="ghost"
@@ -79,9 +79,9 @@ export function getPatientColumns({ onView, onEdit }: PatientTableActions): Colu
               e.stopPropagation();
               onEdit(row.original);
             }}
-            aria-label="Edit patient"
+            leftIcon={<Edit2 className="h-4 w-4" />}
           >
-            <Edit2 className="h-4 w-4" />
+            Edit
           </Button>
         </div>
       ),

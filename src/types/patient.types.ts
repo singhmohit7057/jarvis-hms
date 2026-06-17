@@ -1,5 +1,3 @@
-// #must: Patient module type definitions
-
 import type { GENDER_OPTIONS } from '@/config/constants';
 
 export type Gender = (typeof GENDER_OPTIONS)[number];

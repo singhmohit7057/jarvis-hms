@@ -1,5 +1,3 @@
-// #must: Flexible chart wrapper rendering Recharts chart types by type prop
-
 import {
   ResponsiveContainer,
   LineChart,

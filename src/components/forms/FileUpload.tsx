@@ -1,4 +1,4 @@
-// #must: Drag-and-drop file upload area with preview and validation
+
 import { useState, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Upload, X, FileText } from 'lucide-react';

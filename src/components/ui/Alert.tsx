@@ -1,4 +1,4 @@
-// #must: Alert box with colored left border, optional title, close button, and icon
+
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { AlertCircle, CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';

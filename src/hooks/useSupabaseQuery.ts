@@ -1,4 +1,4 @@
-// #must: Generic Supabase data fetching hook with loading, error, and refetch
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseSupabaseQueryReturn<T> {

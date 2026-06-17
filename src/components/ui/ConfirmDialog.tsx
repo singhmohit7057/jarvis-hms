@@ -1,4 +1,4 @@
-// #must: Confirmation dialog built on Modal with confirm/cancel actions
+
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { AlertTriangle, Info, AlertCircle } from 'lucide-react';

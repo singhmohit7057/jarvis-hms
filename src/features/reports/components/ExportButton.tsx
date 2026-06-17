@@ -1,5 +1,3 @@
-// #must: Export dropdown — Excel, CSV, and Print actions for report data
-
 import * as XLSX from 'xlsx';
 import { Download, FileSpreadsheet, FileText, Printer } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -58,8 +56,10 @@ function exportCSV(
   const link = document.createElement('a');
   link.href = url;
   link.download = `${filename}.csv`;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 function printTable(
@@ -89,8 +89,8 @@ function printTable(
     win.document.write(html);
     win.document.close();
     win.focus();
+    win.addEventListener('afterprint', () => win.close());
     win.print();
-    win.close();
   }
 }
 

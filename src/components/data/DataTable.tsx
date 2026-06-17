@@ -1,4 +1,4 @@
-// #must: Core reusable data table wrapping @tanstack/react-table with search, sort, pagination
+
 import { useState, useMemo } from 'react';
 import {
   useReactTable,

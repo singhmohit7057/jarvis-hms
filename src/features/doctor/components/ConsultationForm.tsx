@@ -1,4 +1,4 @@
-// #must: Main consultation form component combining vitals, diagnosis, and prescription
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller } from 'react-hook-form';
@@ -114,30 +114,34 @@ export function ConsultationForm({
           patient_id: patientId,
           doctor_id: doctorId,
           diagnosis: data.prescription.diagnosis || data.diagnosis,
-          advice: data.prescription.advice ?? null,
-          followup_date: data.prescription.followupDate || null,
+          advice: data.prescription.advice || null,
+          followup_note: data.prescription.followupDate || null,
+          followup_date: null,
         })
         .select()
         .single();
 
       if (rxError) throw rxError;
 
-      // 3. Insert prescription items
-      const items = data.prescription.items.map((item) => ({
-        prescription_id: prescription.id,
-        medicine_name: item.medicineName,
-        dosage: item.dosage,
-        frequency: item.frequency,
-        duration: item.duration,
-        timing: item.timing ?? null,
-        instructions: item.instructions ?? null,
-      }));
+      // 3. Insert prescription items (only rows with a medicine name filled in)
+      const items = (data.prescription.items ?? [])
+        .filter((item) => item.medicineName?.trim())
+        .map((item) => ({
+          prescription_id: prescription.id,
+          medicine_name: item.medicineName!.trim(),
+          dosage: item.dosage?.trim() || '-',
+          frequency: item.frequency?.trim() || '-',
+          duration: item.duration?.trim() || '-',
+          timing: item.timing || null,
+          instructions: item.instructions || null,
+        }));
 
-      const { error: itemsError } = await supabase
-        .from('prescription_items')
-        .insert(items);
-
-      if (itemsError) throw itemsError;
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('prescription_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
 
       // 4. Update appointment status to completed
       const { error: aptError } = await supabase
@@ -158,14 +162,16 @@ export function ConsultationForm({
           doctorId,
           diagnosis: data.prescription.diagnosis || data.diagnosis,
           advice: data.prescription.advice ?? '',
-          followupDate: data.prescription.followupDate,
-          items: data.prescription.items.map((item, idx) => ({
+          followupDate: data.prescription.followupDate ?? '',
+          symptoms: data.symptoms,
+          clinicalNotes: data.notes,
+          items: (data.prescription.items ?? []).filter((item) => item.medicineName?.trim()).map((item, idx) => ({
             id: `item-${idx}`,
             prescriptionId: prescription.id,
-            medicineName: item.medicineName,
-            dosage: item.dosage,
-            frequency: item.frequency,
-            duration: item.duration,
+            medicineName: item.medicineName ?? '',
+            dosage: item.dosage?.trim() || '-',
+            frequency: item.frequency?.trim() || '-',
+            duration: item.duration?.trim() || '-',
             timing: item.timing ?? '',
             instructions: item.instructions,
           })),
@@ -178,21 +184,23 @@ export function ConsultationForm({
         pdf.save(`Rx_${prescription.prescription_no}_${patient.name}.pdf`);
       }
 
-      // Log activity
-      await supabase.from('activity_logs').insert({
+      // Log activity (non-blocking — don't fail the save if this errors)
+      supabase.from('activity_logs').insert({
         action: 'consultation_completed',
         entity_type: 'consultation',
         entity_id: consultation.id,
         description: `Consultation completed for ${patient.name} by Dr. ${doctor.name}`,
         user_name: doctor.name,
-      });
+      }).then(({ error }) => { if (error) console.warn('Activity log failed:', error.message); });
 
       toast.success('Consultation saved successfully');
+      setIsSaving(false);
       onSave();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save consultation';
+      console.error('Save consultation error:', error);
+      const message = error instanceof Error ? error.message
+        : (error as { message?: string })?.message ?? 'Failed to save consultation';
       toast.error(message);
-    } finally {
       setIsSaving(false);
     }
   };

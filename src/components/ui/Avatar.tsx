@@ -1,4 +1,4 @@
-// #must: Avatar component showing image or colored initials fallback
+
 import { cn } from '@/lib/utils';
 
 export interface AvatarProps {

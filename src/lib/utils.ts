@@ -1,5 +1,3 @@
-// #must: General utility functions — className merger, ID generator, helpers
-
 /**
  * Merge class names, filtering out falsy values.
  */

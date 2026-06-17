@@ -1,4 +1,4 @@
-// #must: Client-side search hook with debounce — filters items by matching query against specified fields
+
 import { useState, useMemo, useRef } from 'react';
 import { useDebounce } from './useDebounce';
 

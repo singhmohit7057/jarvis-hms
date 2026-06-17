@@ -1,4 +1,4 @@
-// #must: Single medicine row in the prescription editor with all fields
+
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -42,9 +42,9 @@ export function PrescriptionMedicineRow({
   const itemErrors = errors?.prescription?.items?.[index];
 
   return (
-    <div className="grid grid-cols-12 gap-2 items-start p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 border border-gray-100 dark:border-slate-700">
+    <div className="grid grid-cols-2 sm:[grid-template-columns:3fr_1.5fr_2fr_1.5fr_2.5fr_2fr_auto] gap-2 items-start p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 border border-gray-100 dark:border-slate-700">
       {/* Medicine Name */}
-      <div className="col-span-12 sm:col-span-3">
+      <div className="col-span-2 sm:col-span-1">
         <Controller
           control={control}
           name={`prescription.items.${index}.medicineName`}
@@ -60,7 +60,7 @@ export function PrescriptionMedicineRow({
       </div>
 
       {/* Dosage */}
-      <div className="col-span-6 sm:col-span-1">
+      <div className="col-span-1 sm:col-span-1">
         <Controller
           control={control}
           name={`prescription.items.${index}.dosage`}
@@ -76,7 +76,7 @@ export function PrescriptionMedicineRow({
       </div>
 
       {/* Frequency */}
-      <div className="col-span-6 sm:col-span-2">
+      <div className="col-span-1 sm:col-span-1">
         <Controller
           control={control}
           name={`prescription.items.${index}.frequency`}
@@ -88,7 +88,7 @@ export function PrescriptionMedicineRow({
                 </label>
               )}
               <select
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:border-slate-600 dark:text-gray-100"
+                className="w-full rounded-lg border border-gray-300 bg-white px-2 py-2.5 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:border-slate-600 dark:text-gray-100"
                 {...field}
               >
                 <option value="">Select</option>
@@ -107,7 +107,7 @@ export function PrescriptionMedicineRow({
       </div>
 
       {/* Duration */}
-      <div className="col-span-6 sm:col-span-2">
+      <div className="col-span-1 sm:col-span-1">
         <Controller
           control={control}
           name={`prescription.items.${index}.duration`}
@@ -123,7 +123,7 @@ export function PrescriptionMedicineRow({
       </div>
 
       {/* Timing */}
-      <div className="col-span-6 sm:col-span-2">
+      <div className="col-span-2 sm:col-span-1">
         <Controller
           control={control}
           name={`prescription.items.${index}.timing`}
@@ -135,7 +135,7 @@ export function PrescriptionMedicineRow({
                 </label>
               )}
               <select
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:border-slate-600 dark:text-gray-100"
+                className="w-full rounded-lg border border-gray-300 bg-white px-2 py-2.5 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:border-slate-600 dark:text-gray-100"
                 {...field}
               >
                 {TIMING_OPTIONS.map((opt) => (
@@ -149,29 +149,30 @@ export function PrescriptionMedicineRow({
         />
       </div>
 
-      {/* Instructions + Remove */}
-      <div className="col-span-10 sm:col-span-1">
+      {/* Notes */}
+      <div className="col-span-1 sm:col-span-1">
         <Controller
           control={control}
           name={`prescription.items.${index}.instructions`}
           render={({ field }) => (
             <Input
               label={index === 0 ? 'Notes' : undefined}
-              placeholder="e.g. with warm water"
+              placeholder="e.g."
               {...field}
             />
           )}
         />
       </div>
 
-      <div className="col-span-2 sm:col-span-1 flex items-end justify-end">
+      {/* Delete */}
+      <div className="col-span-1 sm:col-span-1 flex items-end justify-center pb-0.5">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={onRemove}
           disabled={!canRemove}
-          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 mt-1"
+          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
           title="Remove medicine"
         >
           <Trash2 className="h-4 w-4" />

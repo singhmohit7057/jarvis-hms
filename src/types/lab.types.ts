@@ -1,5 +1,3 @@
-// #must: Lab module type definitions — tests, bookings, reports
-
 import type { LAB_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '@/config/constants';
 import type { Patient } from './patient.types';
 
@@ -44,8 +42,11 @@ export interface LabBooking {
   paymentMethod?: LabPaymentMethod;
   status: LabStatus;
   collectedBy?: string;
+  collectorName?: string;
+  bottleNumber?: string;
   processedBy?: string;
   verifiedBy?: string;
+  preparedBy?: string;
   createdAt: string;
 }
 

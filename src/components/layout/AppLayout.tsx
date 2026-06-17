@@ -1,5 +1,6 @@
-// #must: Main app shell — Sidebar + Topbar + content area with responsive behavior
-import { Outlet } from 'react-router-dom';
+
+import { useEffect } from 'react';
+import { Outlet, ScrollRestoration } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -7,6 +8,7 @@ import { MobileNav } from './MobileNav';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useSidebarStore } from '@/store/sidebarStore';
+import { useClinicStore } from '@/store/clinicStore';
 
 export interface AppLayoutProps {
   userName?: string;
@@ -31,6 +33,9 @@ export function AppLayout({
 
   const { toggleDarkMode } = useThemeStore();
   const { isCollapsed, isMobileOpen, toggleCollapse, toggleMobile, closeMobile } = useSidebarStore();
+  const fetchClinic = useClinicStore((s) => s.fetch);
+
+  useEffect(() => { void fetchClinic(); }, [fetchClinic]);
 
   const handleMenuClick = () => {
     if (window.innerWidth < 768) {
@@ -77,6 +82,7 @@ export function AppLayout({
           <Outlet />
         </div>
       </main>
+      <ScrollRestoration />
     </div>
   );
 }

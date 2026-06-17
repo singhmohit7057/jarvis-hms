@@ -1,4 +1,4 @@
-// #must: Shared PDF helpers — document creation, clinic header, footer, table renderer, number-to-words
+
 import { jsPDF } from 'jspdf';
 import { CLINIC_INFO } from '@/config/constants';
 

@@ -1,4 +1,4 @@
-// #must: Zustand store for POS cart with persist middleware for session survival
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Medicine, MedicineBatch, CartItem, GSTBreakdown } from '@/types';
@@ -9,6 +9,7 @@ interface CartCustomer {
   patientId?: string;
   name: string;
   phone: string;
+  doctorName: string;
 }
 
 interface CartDiscount {
@@ -74,19 +75,17 @@ export const useCart = create<CartStore>()(
         const { discount } = get();
         const subtotal = get().getSubtotal();
         const gstTotal = get().getGSTTotal();
-        const totalBeforeDiscount = subtotal + gstTotal;
 
         if (discount.type === 'percentage') {
-          return Math.round((totalBeforeDiscount * discount.value) / 100 * 100) / 100;
+          return Math.round(subtotal * discount.value / 100 * 100) / 100;
         }
-        return Math.min(discount.value, totalBeforeDiscount);
+        return Math.min(discount.value, subtotal + gstTotal);
       },
 
       getGrandTotal: () => {
         const subtotal = get().getSubtotal();
-        const gstTotal = get().getGSTTotal();
         const discountAmount = get().getDiscountAmount();
-        return Math.round((subtotal + gstTotal - discountAmount) * 100) / 100;
+        return Math.round(subtotal - discountAmount);
       },
 
       getChangeAmount: () => {
@@ -98,6 +97,13 @@ export const useCart = create<CartStore>()(
 
       addItem: (medicine: Medicine, batch: MedicineBatch) => {
         set((state) => {
+          // looseSell=true → sell by piece, price = MRP/packSize, stock in pieces
+          // looseSell=false → sell by whole unit (bottle/strip), price = MRP, stock in units
+          const packSize = Math.max(medicine.packSize, 1);
+          const unitPrice = medicine.looseSell
+            ? Math.round((batch.mrp / packSize) * 100) / 100
+            : batch.mrp;
+
           const existingIndex = state.items.findIndex(
             (item) => item.medicineId === medicine.id && item.batchId === batch.id
           );
@@ -109,7 +115,7 @@ export const useCart = create<CartStore>()(
 
             if (newQty > batch.quantityInStock) return state;
 
-            const gstResult = calculateGST(batch.sellingPrice * newQty, medicine.gstPercentage);
+            const gstResult = calculateGST(unitPrice * newQty, medicine.gstPercentage);
 
             updated[existingIndex] = {
               ...existing,
@@ -123,7 +129,7 @@ export const useCart = create<CartStore>()(
 
           if (batch.quantityInStock < 1) return state;
 
-          const gstResult = calculateGST(batch.sellingPrice, medicine.gstPercentage);
+          const gstResult = calculateGST(unitPrice, medicine.gstPercentage);
 
           const newItem: CartItem = {
             id: `${medicine.id}-${batch.id}-${Date.now()}`,
@@ -132,9 +138,12 @@ export const useCart = create<CartStore>()(
             medicineName: medicine.name,
             batchNumber: batch.batchNumber,
             quantity: 1,
-            unitPrice: batch.sellingPrice,
+            unitPrice,
+            packSize,
+            looseSell: medicine.looseSell,
             gstPercentage: medicine.gstPercentage as GSTPercentage,
             hsnCode: medicine.hsnCode,
+            expiryDate: batch.expiryDate,
             gstAmount: gstResult.totalGst,
             totalPrice: gstResult.totalWithGst,
             maxStock: batch.quantityInStock,
@@ -202,6 +211,19 @@ export const useCart = create<CartStore>()(
     }),
     {
       name: 'jarvis-pharmacy-cart',
+      version: 4,
+      migrate: (persisted: unknown) => {
+        const s = persisted as { items?: Array<Record<string, unknown>> };
+        return {
+          ...(persisted as object),
+          items: (s.items ?? []).map((item) => ({
+            ...item,
+            expiryDate: item['expiryDate'] ?? '',
+            packSize: item['packSize'] ?? 1,
+            looseSell: item['looseSell'] ?? false,
+          })),
+        };
+      },
       partialize: (state) => ({
         items: state.items,
         customer: state.customer,

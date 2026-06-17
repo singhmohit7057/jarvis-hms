@@ -1,4 +1,4 @@
-// #must: Lab booking form — patient select, multi-select tests, total, payment method
+
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

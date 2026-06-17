@@ -1,5 +1,3 @@
-// #must: Report type definitions — sales, stock, and expiry reports
-
 export interface DateRange {
   startDate: string;
   endDate: string;

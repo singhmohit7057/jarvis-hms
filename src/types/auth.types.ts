@@ -1,5 +1,3 @@
-// #must: Authentication and user-related type definitions
-
 import { USER_ROLES } from '@/config/constants';
 
 // Derive UserRole from the const object values

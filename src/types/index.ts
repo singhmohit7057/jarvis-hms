@@ -1,5 +1,3 @@
-// #must: Barrel re-export of all type definitions
-
 export type * from './auth.types';
 export type * from './patient.types';
 export type * from './pharmacy.types';

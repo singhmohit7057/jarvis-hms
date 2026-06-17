@@ -1,4 +1,4 @@
-// #must: Patient history panel for consultation page — past visits, prescriptions, lab results
+
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Stethoscope, Pill, TestTube2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
@@ -184,7 +184,7 @@ export function PatientHistory({ patientId }: PatientHistoryProps) {
                     {labBookings
                       .filter(
                         (lb) =>
-                          formatDate(lb.createdAt) === formatDate(appointment.date)
+                          formatDate(lb.created_at) === formatDate(appointment.date)
                       )
                       .map((lb) => (
                         <div key={lb.id} className="pl-5">

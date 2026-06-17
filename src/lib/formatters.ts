@@ -1,5 +1,3 @@
-// #must: Formatting utilities — currency (INR), dates, phone numbers, percentages
-
 /**
  * Format a number as Indian Rupees (₹1,23,456.00).
  * Uses the Indian numbering system (en-IN locale).

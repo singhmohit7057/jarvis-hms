@@ -1,5 +1,3 @@
-// #must: Recent activity feed — fetches activity_logs, shows icon per action type and relative time
-
 import {
   UserPlus,
   ShoppingCart,
@@ -23,8 +21,8 @@ export interface RecentActivityListProps {
 }
 
 function getIcon(action: string, entityType: string) {
-  const a = action.toUpperCase();
-  const e = entityType.toLowerCase();
+  const a = (action ?? '').toUpperCase();
+  const e = (entityType ?? '').toLowerCase();
 
   if (e === 'patient') return UserPlus;
   if (e === 'sale' || e === 'pharmacy') return ShoppingCart;

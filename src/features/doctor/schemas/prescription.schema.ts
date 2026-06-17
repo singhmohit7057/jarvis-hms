@@ -1,22 +1,20 @@
-// #must: Zod validation schemas for consultation and prescription forms
+
 import { z } from 'zod';
 
 export const prescriptionItemSchema = z.object({
-  medicineName: z.string().min(1, 'Medicine name is required'),
-  dosage: z.string().min(1, 'Dosage is required'),
-  frequency: z.string().min(1, 'Frequency is required'),
-  duration: z.string().min(1, 'Duration is required'),
+  medicineName: z.string().optional(),
+  dosage: z.string().optional(),
+  frequency: z.string().optional(),
+  duration: z.string().optional(),
   timing: z.string().optional(),
   instructions: z.string().optional(),
 });
 
 export const prescriptionSchema = z.object({
-  diagnosis: z.string().min(1, 'Diagnosis is required'),
+  diagnosis: z.string().optional(),
   advice: z.string().optional(),
   followupDate: z.string().optional(),
-  items: z
-    .array(prescriptionItemSchema)
-    .min(1, 'At least one medicine is required'),
+  items: z.array(prescriptionItemSchema).optional(),
 });
 
 export const vitalsSchema = z.object({

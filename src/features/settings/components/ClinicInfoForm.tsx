@@ -1,4 +1,5 @@
-// #must: Clinic info form with react-hook-form — fields for name, email, phone, address, GST
+
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,6 +35,7 @@ export function ClinicInfoForm({ onSubmit, defaultValues, isLoading = false }: C
   const {
     control,
     handleSubmit,
+    reset,
     formState: { errors: _errors },
   } = useForm<ClinicInfoFormValues>({
     resolver: zodResolver(clinicInfoSchema),
@@ -45,6 +47,12 @@ export function ClinicInfoForm({ onSubmit, defaultValues, isLoading = false }: C
       gstNumber: defaultValues?.gstNumber ?? '',
     },
   });
+
+  // Re-populate when async defaultValues arrive
+  useEffect(() => {
+    if (defaultValues) reset(defaultValues);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(defaultValues)]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

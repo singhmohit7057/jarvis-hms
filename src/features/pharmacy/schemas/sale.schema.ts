@@ -1,4 +1,4 @@
-// #must: Zod validation schemas for sale customer and payment forms
+
 import { z } from 'zod';
 import { PAYMENT_METHODS } from '@/config/constants';
 

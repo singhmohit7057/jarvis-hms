@@ -1,5 +1,3 @@
-// #must: Stock report page — inventory value, low/out-of-stock counts, category distribution
-
 import { useState, useCallback, useMemo } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Package, AlertTriangle, XCircle, BarChart2 } from 'lucide-react';
@@ -22,7 +20,9 @@ interface StockRow {
   category: string;
   hsnCode: string;
   totalStock: number;
-  stockValue: number;
+  purchaseValue: number;
+  sellingValue: number;
+  mrpValue: number;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
 }
 
@@ -32,13 +32,14 @@ interface RawMedicine {
   category: MedicineCategory;
   hsn_code: string;
   is_active: boolean;
+  reorder_level: number;
   medicine_batches: Array<{
     quantity_in_stock: number;
     purchase_price: number;
+    selling_price: number;
+    mrp: number;
   }>;
 }
-
-const LOW_STOCK_THRESHOLD = 10;
 
 const PIE_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899','#14b8a6'];
 
@@ -55,7 +56,7 @@ export function StockReportPage() {
     useCallback(async () => {
       const { data, error } = await supabase
         .from('medicines')
-        .select('id, name, category, hsn_code, is_active, medicine_batches(quantity_in_stock, purchase_price)')
+        .select('id, name, category, hsn_code, is_active, reorder_level, medicine_batches(quantity_in_stock, purchase_price, selling_price, mrp)')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -67,14 +68,13 @@ export function StockReportPage() {
     return rawMedicines.map((med) => {
       const batches = med.medicine_batches ?? [];
       const totalStock = batches.reduce((s, b) => s + (b.quantity_in_stock ?? 0), 0);
-      const stockValue = batches.reduce(
-        (s, b) => s + (b.quantity_in_stock ?? 0) * (b.purchase_price ?? 0),
-        0
-      );
+      const purchaseValue = batches.reduce((s, b) => s + (b.quantity_in_stock ?? 0) * (b.purchase_price ?? 0), 0);
+      const sellingValue = batches.reduce((s, b) => s + (b.quantity_in_stock ?? 0) * (b.selling_price ?? 0), 0);
+      const mrpValue = batches.reduce((s, b) => s + (b.quantity_in_stock ?? 0) * (b.mrp ?? 0), 0);
 
       let status: StockRow['status'] = 'In Stock';
       if (totalStock === 0) status = 'Out of Stock';
-      else if (totalStock <= LOW_STOCK_THRESHOLD) status = 'Low Stock';
+      else if (totalStock <= (med.reorder_level ?? 0)) status = 'Low Stock';
 
       return {
         medicineId: med.id,
@@ -82,7 +82,9 @@ export function StockReportPage() {
         category: med.category,
         hsnCode: med.hsn_code,
         totalStock,
-        stockValue,
+        purchaseValue,
+        sellingValue,
+        mrpValue,
         status,
       };
     });
@@ -98,7 +100,8 @@ export function StockReportPage() {
 
   // Stats
   const totalMedicines = allRows.length;
-  const totalStockValue = allRows.reduce((s, r) => s + r.stockValue, 0);
+  const totalPurchaseValue = allRows.reduce((s, r) => s + r.purchaseValue, 0);
+  const totalSellingValue = allRows.reduce((s, r) => s + r.sellingValue, 0);
   const lowStockCount = allRows.filter((r) => r.status === 'Low Stock').length;
   const outOfStockCount = allRows.filter((r) => r.status === 'Out of Stock').length;
 
@@ -125,9 +128,14 @@ export function StockReportPage() {
       cell: ({ row }) => row.original.totalStock.toLocaleString('en-IN'),
     },
     {
-      accessorKey: 'stockValue',
-      header: 'Stock Value',
-      cell: ({ row }) => formatCurrency(row.original.stockValue),
+      accessorKey: 'purchaseValue',
+      header: 'Purchase Value',
+      cell: ({ row }) => formatCurrency(row.original.purchaseValue),
+    },
+    {
+      accessorKey: 'sellingValue',
+      header: 'Selling Value',
+      cell: ({ row }) => formatCurrency(row.original.sellingValue),
     },
     {
       accessorKey: 'status',
@@ -146,7 +154,8 @@ export function StockReportPage() {
     { header: 'Category', key: 'category' },
     { header: 'HSN Code', key: 'hsnCode' },
     { header: 'Total Stock', key: 'totalStock' },
-    { header: 'Stock Value', key: 'stockValue' },
+    { header: 'Purchase Value', key: 'purchaseValue' },
+    { header: 'Selling Value', key: 'sellingValue' },
     { header: 'Status', key: 'status' },
   ];
 
@@ -184,7 +193,7 @@ export function StockReportPage() {
         title="Stock Report"
         subtitle="Inventory levels, values, and category distribution"
         breadcrumbs={[
-          { label: 'Reports', path: ROUTES.REPORTS_STOCK },
+          { label: 'Reports', path: ROUTES.REPORTS },
           { label: 'Stock Report' },
         ]}
       />
@@ -197,7 +206,7 @@ export function StockReportPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         <StatCard
           title="Total Medicines"
           value={totalMedicines.toLocaleString('en-IN')}
@@ -205,10 +214,16 @@ export function StockReportPage() {
           color="primary"
         />
         <StatCard
-          title="Total Stock Value"
-          value={formatCurrency(totalStockValue)}
+          title="Purchase Value"
+          value={formatCurrency(totalPurchaseValue)}
           icon={BarChart2}
           color="success"
+        />
+        <StatCard
+          title="Selling Value"
+          value={formatCurrency(totalSellingValue)}
+          icon={BarChart2}
+          color="primary"
         />
         <StatCard
           title="Low Stock Items"
@@ -247,7 +262,8 @@ export function StockReportPage() {
         searchable
         summary={[
           { label: 'Showing', value: `${filteredRows.length} medicines` },
-          { label: 'Total Value', value: formatCurrency(filteredRows.reduce((s, r) => s + r.stockValue, 0)) },
+          { label: 'Purchase Value', value: formatCurrency(filteredRows.reduce((s, r) => s + r.purchaseValue, 0)) },
+          { label: 'Selling Value', value: formatCurrency(filteredRows.reduce((s, r) => s + r.sellingValue, 0)) },
         ]}
       />
     </div>

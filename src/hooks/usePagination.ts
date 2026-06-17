@@ -1,4 +1,4 @@
-// #must: Pagination state hook — manages page navigation for data lists
+
 import { useState, useMemo, useCallback } from 'react';
 
 interface UsePaginationReturn {

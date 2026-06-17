@@ -1,4 +1,4 @@
-// #must: Central export point for all PDF generators
+
 export { generateInvoicePDF } from './invoice.pdf';
 export { generatePrescriptionPDF } from './prescription.pdf';
 export { generateLabReportPDF } from './lab-report.pdf';

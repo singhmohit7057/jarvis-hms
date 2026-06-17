@@ -1,4 +1,4 @@
-// #must: DataTable column definitions for user management with role-colored badges
+
 import type { ColumnDef } from '@tanstack/react-table';
 import type { User } from '@/types';
 import type { UserRole } from '@/types';

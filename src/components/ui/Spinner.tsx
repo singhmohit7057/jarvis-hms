@@ -1,4 +1,4 @@
-// #must: Animated loading spinner SVG component
+
 import { cn } from '@/lib/utils';
 
 export interface SpinnerProps {

@@ -1,8 +1,7 @@
-// #must: Report entry form for a single test — renders parameter rows with auto-flag
+
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
-import { ChevronDown, ChevronUp, Save } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ReportParameterRow } from './ReportParameterRow';
 import type { LabTest, LabBookingTest, LabResultEntry, LabReport } from '@/types';
@@ -40,26 +39,24 @@ export function ReportEntryForm({
       setResults(existingReport.results);
       setInterpretation(existingReport.interpretation ?? '');
     }
-  }, [existingReport]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingReport?.id]);
 
   const handleValueChange = (index: number, value: string) => {
-    setResults((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], value };
-      return updated;
-    });
+    const updated = results.map((r, i) => i === index ? { ...r, value } : r);
+    setResults(updated);
+    onSave({ results: updated, interpretation });
   };
 
-  const handleFlagChange = (index: number, flag: LabResultEntry['flag']) => {
-    setResults((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], flag };
-      return updated;
-    });
+  const handleFlagChange = (index: number, newFlag: LabResultEntry['flag']) => {
+    const updated = results.map((r, i) => i === index ? { ...r, flag: newFlag } : r);
+    setResults(updated);
+    onSave({ results: updated, interpretation });
   };
 
-  const handleSave = () => {
-    onSave({ results, interpretation });
+  const handleInterpretationChange = (val: string) => {
+    setInterpretation(val);
+    onSave({ results, interpretation: val });
   };
 
   const filledCount = results.filter((r) => r.value.trim() !== '').length;
@@ -146,23 +143,12 @@ export function ReportEntryForm({
             <Textarea
               label="Interpretation / Comments"
               value={interpretation}
-              onChange={(e) => setInterpretation(e.target.value)}
+              onChange={(e) => handleInterpretationChange(e.target.value)}
               placeholder="Enter clinical interpretation or additional comments..."
               rows={3}
             />
           </div>
 
-          {/* Save button */}
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<Save className="h-3.5 w-3.5" />}
-              onClick={handleSave}
-            >
-              Save Results
-            </Button>
-          </div>
         </div>
       )}
     </div>

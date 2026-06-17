@@ -1,4 +1,4 @@
-// #must: Pre-configured badge mapping common status strings to badge variants
+
 import { Badge, type BadgeProps } from '@/components/ui/Badge';
 
 export interface StatusBadgeProps {

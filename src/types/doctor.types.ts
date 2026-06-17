@@ -1,5 +1,3 @@
-// #must: Doctor module type definitions — doctors, appointments, consultations, prescriptions
-
 import type { APPOINTMENT_STATUS, PAYMENT_STATUS } from '@/config/constants';
 import type { Patient } from './patient.types';
 

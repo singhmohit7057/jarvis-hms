@@ -1,4 +1,4 @@
-// #must: Root app component — initializes auth, renders router and toast notifications
+
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 import { useAuthStore } from '@/store/authStore';

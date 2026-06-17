@@ -1,4 +1,4 @@
-// #must: Dashboard stat card with icon, value, trend indicator
+
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -17,6 +17,8 @@ export interface StatCardProps {
   };
   /** Color theme for icon background */
   color?: 'primary' | 'success' | 'warning' | 'danger';
+  /** Optional small subtitle shown below the title */
+  subtitle?: string;
 }
 
 const colorConfig: Record<NonNullable<StatCardProps['color']>, { bg: string; icon: string }> = {
@@ -38,7 +40,7 @@ const colorConfig: Record<NonNullable<StatCardProps['color']>, { bg: string; ico
   },
 };
 
-export function StatCard({ title, value, icon: Icon, trend, color = 'primary' }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, trend, color = 'primary', subtitle }: StatCardProps) {
   const { bg, icon: iconColor } = colorConfig[color];
 
   return (
@@ -73,6 +75,9 @@ export function StatCard({ title, value, icon: Icon, trend, color = 'primary' }:
       <div className="mt-4">
         <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{title}</p>
+        {subtitle && (
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 leading-tight">{subtitle}</p>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-// #must: Modal dialog with portal, backdrop, escape key, focus trap, and smooth animations
+
 import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
@@ -43,25 +43,27 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer }:
     if (e.target === overlayRef.current) onClose();
   };
 
-  // Trap focus inside modal and handle escape
+  // Handle escape key and body scroll lock
   useEffect(() => {
     if (!isOpen) return;
-
     document.addEventListener('keydown', handleKeyDown);
-    // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
-
-    // Focus the modal content on open
-    const timer = setTimeout(() => {
-      contentRef.current?.focus();
-    }, 50);
-
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
-      clearTimeout(timer);
     };
   }, [isOpen, handleKeyDown]);
+
+  // Focus the modal wrapper on open — but only if nothing inside already has focus
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => {
+      if (!contentRef.current?.contains(document.activeElement)) {
+        contentRef.current?.focus();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -80,6 +82,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer }:
           'w-full rounded-xl bg-white shadow-lg animate-scale-in',
           'dark:bg-slate-800',
           'focus:outline-none',
+          'flex flex-col max-h-[90vh]',
           sizeStyles[size]
         )}
       >
@@ -98,7 +101,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer }:
         )}
 
         {/* Body */}
-        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">{children}</div>
+        <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
 
         {/* Footer */}
         {footer && (

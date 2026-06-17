@@ -1,4 +1,4 @@
-// #must: Convenience wrapper over sonner toast — provides typed success/error/warning/info/promise methods
+
 import { toast } from 'sonner';
 
 interface ToastMessages {

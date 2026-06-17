@@ -1,4 +1,4 @@
-// #must: Patient detail page — info card, tabbed view (appointments, prescriptions, lab reports, timeline)
+
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Heart,
   Download,
+  Activity,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -33,7 +34,20 @@ import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Patient, Appointment, Prescription, LabBooking } from '@/types';
 
-type TabId = 'appointments' | 'prescriptions' | 'lab-reports' | 'timeline';
+type TabId = 'appointments' | 'prescriptions' | 'vitals' | 'lab-reports' | 'timeline';
+
+interface VitalsRecord {
+  id: string;
+  date: string;
+  diagnosis: string;
+  bp: string;
+  pulse: string;
+  temp: string;
+  weight: string;
+  height: string;
+  spo2: string;
+  doctorName: string;
+}
 
 interface TimelineEvent {
   id: string;
@@ -47,6 +61,7 @@ interface TimelineEvent {
 const TAB_ITEMS = [
   { id: 'appointments' as const, label: 'Appointments', icon: Calendar },
   { id: 'prescriptions' as const, label: 'Prescriptions', icon: Pill },
+  { id: 'vitals' as const, label: 'Vitals', icon: Activity },
   { id: 'lab-reports' as const, label: 'Lab Reports', icon: TestTube2 },
   { id: 'timeline' as const, label: 'Timeline', icon: Clock },
 ];
@@ -158,6 +173,37 @@ export function PatientDetailPage() {
     [prescriptionsRaw]
   );
 
+  // Fetch vitals history from consultations
+  const { data: vitalsRaw, isLoading: loadingVitals } = useSupabaseQuery<Record<string, unknown>>(
+    async () =>
+      supabase
+        .from('consultations')
+        .select('id, created_at, vitals, diagnosis, doctor:doctors(name)')
+        .eq('patient_id', id!)
+        .order('created_at', { ascending: false }),
+    [id]
+  );
+
+  const vitalsHistory: VitalsRecord[] = useMemo(
+    () =>
+      vitalsRaw.map((c) => {
+        const v = (c.vitals as Record<string, string>) ?? {};
+        return {
+          id: c.id as string,
+          date: c.created_at as string,
+          diagnosis: (c.diagnosis as string) || '-',
+          bp: v.bp || '-',
+          pulse: v.pulse || '-',
+          temp: v.temp || '-',
+          weight: v.weight || '-',
+          height: v.height || '-',
+          spo2: v.spo2 || '-',
+          doctorName: (c.doctor as Record<string, string>)?.name || 'Unknown',
+        };
+      }),
+    [vitalsRaw]
+  );
+
   // Fetch lab bookings
   const { data: labBookingsRaw, isLoading: loadingLabs } = useSupabaseQuery<Record<string, unknown>>(
     async () =>
@@ -204,7 +250,7 @@ export function PatientDetailPage() {
         type: 'appointment',
         title: `Appointment with Dr. ${apt.doctor?.name ?? 'Unknown'}`,
         description: `${apt.status} - Fee: ${formatCurrency(apt.fee)}`,
-        date: apt.date,
+        date: apt.createdAt,
         status: apt.status,
       });
     });
@@ -415,8 +461,8 @@ export function PatientDetailPage() {
           <InfoItem icon={Droplets} label="Blood Group" value={patient.bloodGroup || 'Unknown'} />
           <InfoItem icon={AlertTriangle} label="Allergies" value={patient.allergies || 'None reported'} />
           <InfoItem icon={Heart} label="Medical History" value={patient.medicalHistory || 'None recorded'} />
-          {patient.emergencyContact && (
-            <InfoItem icon={Phone} label="Emergency Contact" value={patient.emergencyContact} />
+          {patient.emergencyContactName && (
+            <InfoItem icon={Phone} label="Emergency Contact" value={patient.emergencyContactName} />
           )}
           <InfoItem icon={Clock} label="Registered On" value={formatDateTime(patient.createdAt)} />
         </div>
@@ -446,6 +492,9 @@ export function PatientDetailPage() {
             isLoading={loadingPrescriptions}
             onViewPrescription={setSelectedPrescription}
           />
+        )}
+        {activeTab === 'vitals' && (
+          <VitalsTab records={vitalsHistory} isLoading={loadingVitals} />
         )}
         {activeTab === 'lab-reports' && (
           <LabReportsTab
@@ -541,6 +590,43 @@ function PrescriptionsTab({
       pageSize={10}
       onRowClick={onViewPrescription}
     />
+  );
+}
+
+function VitalsTab({ records, isLoading }: { records: VitalsRecord[]; isLoading: boolean }) {
+  if (isLoading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
+  if (records.length === 0) return (
+    <EmptyState icon={Activity} title="No vitals recorded" description="Vitals will appear here after consultations." />
+  );
+  return (
+    <Card>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-700">
+              {['Date', 'Doctor', 'Diagnosis', 'BP', 'Pulse', 'Temp', 'Weight', 'Height', 'SpO2'].map((h) => (
+                <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+            {records.map((r) => (
+              <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30">
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDate(r.date)}</td>
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">Dr. {r.doctorName}</td>
+                <td className="px-4 py-2.5 text-gray-900 dark:text-gray-100 max-w-[160px] truncate">{r.diagnosis}</td>
+                <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-gray-100">{r.bp}</td>
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{r.pulse}</td>
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{r.temp}</td>
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{r.weight}</td>
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{r.height}</td>
+                <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{r.spo2}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }
 

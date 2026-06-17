@@ -1,10 +1,10 @@
-// #must: Full appointments management page with booking modal, filters, and data table
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Plus, Calendar, List } from 'lucide-react';
+import { Plus, Calendar, List, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Tabs } from '@/components/ui/Tabs';
@@ -21,7 +21,7 @@ import { useAppointmentColumns } from '../components/AppointmentList';
 import { AppointmentCalendar } from '../components/AppointmentCalendar';
 import { appointmentSchema } from '../schemas/appointment.schema';
 import { supabase } from '@/lib/supabase';
-import { generateReceiptPDF } from '@/lib/pdf/receipt.pdf';
+import { generateReceiptPDF, fetchReceiptClinic } from '@/lib/pdf/receipt.pdf';
 import { ROUTES } from '@/config/routes';
 import { PAYMENT_METHODS } from '@/config/constants';
 import type { AppointmentFormData } from '../schemas/appointment.schema';
@@ -41,7 +41,7 @@ interface DoctorOption {
 
 export function AppointmentsPage() {
   const navigate = useNavigate();
-  const { appointments, isLoading, fetchAppointments, createAppointment, cancelAppointment } =
+  const { appointments, isLoading, fetchAppointments, createAppointment, cancelAppointment, updatePaymentStatus } =
     useAppointments();
 
   // UI state
@@ -51,6 +51,10 @@ export function AppointmentsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Local display strings for date/time — kept separate from form values to avoid re-render resets
+  const [dateDisplay, setDateDisplay] = useState('');
+  const [timeDisplay, setTimeDisplay] = useState('');
 
   // Filter state
   const [filterDate, setFilterDate] = useState<Date | null>(null);
@@ -80,6 +84,7 @@ export function AppointmentsPage() {
       time: '',
       fee: 0,
       paymentMethod: 'cash',
+      paymentStatus: 'pending',
       notes: '',
     },
   });
@@ -164,6 +169,8 @@ export function AppointmentsPage() {
 
   const openBookingModal = () => {
     reset();
+    setDateDisplay('');
+    setTimeDisplay('');
     fetchPatients();
     setShowBookingModal(true);
   };
@@ -177,6 +184,7 @@ export function AppointmentsPage() {
       const patient = patientOptions.find((p) => p.value === data.patientId);
       const doctor = doctorOptions.find((d) => d.value === data.doctorId);
 
+      const clinic = await fetchReceiptClinic();
       const receipt = generateReceiptPDF({
         receiptNo: result.appointment_no ?? `APT-${Date.now()}`,
         date: new Date().toISOString(),
@@ -187,7 +195,7 @@ export function AppointmentsPage() {
         amount: data.fee,
         paymentMethod: data.paymentMethod,
         receivedBy: 'Reception',
-      });
+      }, clinic);
       receipt.save(`Receipt_${result.appointment_no ?? 'APT'}.pdf`);
 
       toast.success('Appointment booked successfully');
@@ -226,16 +234,42 @@ export function AppointmentsPage() {
     navigate(ROUTES.CONSULTATION.replace(':id', apt.id));
   };
 
+  const handlePrintReceipt = useCallback(async (apt: Appointment) => {
+    const clinic = await fetchReceiptClinic();
+    const receipt = generateReceiptPDF({
+      receiptNo: apt.appointmentNo ?? `APT-${apt.id.slice(0, 8).toUpperCase()}`,
+      date: new Date().toISOString(),
+      patientName: apt.patient?.name ?? 'Patient',
+      patientPhone: apt.patient?.phone ?? '',
+      serviceType: 'Doctor Consultation',
+      serviceDetails: apt.doctor ? `Dr. ${apt.doctor.name}` : 'Consultation',
+      amount: apt.fee,
+      paymentMethod: apt.paymentStatus === 'paid' ? 'Cash' : 'Pending',
+      receivedBy: 'Reception',
+    }, clinic);
+    receipt.save(`Receipt_${apt.appointmentNo ?? apt.id}.pdf`);
+  }, []);
+
+  const handleMarkPaid = useCallback(async (apt: Appointment) => {
+    try {
+      await updatePaymentStatus(apt.id, 'paid');
+      toast.success('Payment marked as paid');
+    } catch {
+      toast.error('Failed to update payment');
+    }
+  }, [updatePaymentStatus]);
+
   const columns = useAppointmentColumns({
     onView: handleView,
     onStartConsultation: handleStartConsultation,
     onCancel: handleCancelAppointment,
+    onMarkPaid: handleMarkPaid,
+    onPrintReceipt: handlePrintReceipt,
   });
 
   const statusTabs = [
     { id: 'all', label: 'All' },
     { id: 'scheduled', label: 'Scheduled' },
-    { id: 'in_progress', label: 'In Progress' },
     { id: 'completed', label: 'Completed' },
     { id: 'cancelled', label: 'Cancelled' },
   ];
@@ -383,33 +417,85 @@ export function AppointmentsPage() {
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Controller
-              control={control}
-              name="date"
-              render={({ field }) => (
-                <Input
-                  label="Date"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Date</label>
+              <div className="relative">
+                <input
                   type="text"
-                  placeholder="YYYY-MM-DD"
-                  error={errors.date?.message}
-                  {...field}
-                  onChange={(e) => field.onChange(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="DD-MM-YYYY"
+                  maxLength={10}
+                  value={dateDisplay}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    let display = digits;
+                    if (digits.length > 4) display = digits.slice(0,2) + '-' + digits.slice(2,4) + '-' + digits.slice(4);
+                    else if (digits.length > 2) display = digits.slice(0,2) + '-' + digits.slice(2);
+                    setDateDisplay(display);
+                    if (digits.length === 8) {
+                      const dd = digits.slice(0,2), mm = digits.slice(2,4), yyyy = digits.slice(4);
+                      setValue('date', `${yyyy}-${mm}-${dd}`, { shouldValidate: true });
+                    } else {
+                      setValue('date', '', { shouldValidate: false });
+                    }
+                  }}
+                  className={`w-full rounded-lg border bg-white pl-3.5 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:text-gray-100 dark:placeholder:text-gray-500 ${errors.date ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-300 dark:border-slate-600'}`}
                 />
-              )}
-            />
-            <Controller
-              control={control}
-              name="time"
-              render={({ field }) => (
-                <Input
-                  label="Time"
+                {/* hidden native date picker triggered by icon */}
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  tabIndex={-1}
+                  className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                  onChange={(e) => {
+                    const val = e.target.value; // YYYY-MM-DD
+                    if (!val) return;
+                    const [yyyy, mm, dd] = val.split('-');
+                    setDateDisplay(`${dd}-${mm}-${yyyy}`);
+                    setValue('date', val, { shouldValidate: true });
+                  }}
+                />
+                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+              {errors.date && <p className="mt-1.5 text-xs text-red-500">{errors.date.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Time</label>
+              <div className="relative">
+                <input
                   type="text"
-                  placeholder="HH:MM (24h)"
-                  error={errors.time?.message}
-                  {...field}
+                  inputMode="numeric"
+                  placeholder="HH:MM"
+                  maxLength={5}
+                  value={timeDisplay}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    const display = digits.length > 2 ? digits.slice(0,2) + ':' + digits.slice(2) : digits;
+                    setTimeDisplay(display);
+                    if (/^\d{2}:\d{2}$/.test(display)) {
+                      setValue('time', display, { shouldValidate: true });
+                    } else {
+                      setValue('time', '', { shouldValidate: false });
+                    }
+                  }}
+                  className={`w-full rounded-lg border bg-white pl-3.5 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:bg-slate-800 dark:text-gray-100 dark:placeholder:text-gray-500 ${errors.time ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-300 dark:border-slate-600'}`}
                 />
-              )}
-            />
+                {/* hidden native time picker triggered by icon */}
+                <input
+                  type="time"
+                  tabIndex={-1}
+                  className="absolute inset-0 opacity-0 w-full cursor-pointer"
+                  onChange={(e) => {
+                    const val = e.target.value; // HH:MM
+                    if (!val) return;
+                    setTimeDisplay(val);
+                    setValue('time', val, { shouldValidate: true });
+                  }}
+                />
+                <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+              {errors.time && <p className="mt-1.5 text-xs text-red-500">{errors.time.message}</p>}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -453,6 +539,26 @@ export function AppointmentsPage() {
               )}
             />
           </div>
+
+          <Controller
+            control={control}
+            name="paymentStatus"
+            render={({ field }) => (
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                  onClick={() => field.onChange(field.value === 'paid' ? 'pending' : 'paid')}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${field.value === 'paid' ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.value === 'paid' ? 'translate-x-5' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Payment received
+                  {field.value === 'paid' && <span className="ml-2 text-xs text-green-600 font-semibold">Paid</span>}
+                  {field.value !== 'paid' && <span className="ml-2 text-xs text-orange-500 font-semibold">Pending</span>}
+                </span>
+              </label>
+            )}
+          />
 
           <Controller
             control={control}

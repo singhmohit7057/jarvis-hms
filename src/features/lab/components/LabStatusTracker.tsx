@@ -1,4 +1,4 @@
-// #must: Visual horizontal stepper showing lab workflow status progression
+
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import { LAB_STATUS } from '@/config/constants';

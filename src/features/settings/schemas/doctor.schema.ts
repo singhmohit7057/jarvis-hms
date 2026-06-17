@@ -1,4 +1,4 @@
-// #must: Zod validation schema for doctor management form
+
 import { z } from 'zod';
 
 export const SPECIALIZATION_OPTIONS = [
@@ -29,7 +29,7 @@ export const DAYS_OF_WEEK = [
   'Sunday',
 ] as const;
 
-const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)(\s?(AM|PM))?$/i;
 
 export const doctorSchema = z.object({
   name: z

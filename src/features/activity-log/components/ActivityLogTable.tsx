@@ -1,4 +1,4 @@
-// #must: DataTable column definitions for activity log — timestamps, user, action, entity, details
+
 import type { ColumnDef } from '@tanstack/react-table';
 import type { ActivityLog } from '@/types';
 import { Badge } from '@/components/ui';

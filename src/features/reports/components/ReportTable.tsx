@@ -1,5 +1,3 @@
-// #must: Report table with DataTable, optional export button, and optional summary row
-
 import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/data/DataTable';
 import { ExportButton } from './ExportButton';

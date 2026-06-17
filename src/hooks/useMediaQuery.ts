@@ -1,4 +1,4 @@
-// #must: Reactive media query hook — returns boolean indicating whether query matches
+
 import { useState, useEffect } from 'react';
 
 export function useMediaQuery(query: string): boolean {

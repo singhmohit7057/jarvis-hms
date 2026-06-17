@@ -1,8 +1,9 @@
-// #must: Fixed top navbar with hamburger, search, dark mode toggle, notifications, profile
+
 import { cn } from '@/lib/utils';
-import { Menu, Search, Moon, Sun } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
 import { NotificationDropdown } from './NotificationDropdown';
 import { ProfileDropdown } from './ProfileDropdown';
+import { GlobalSearch } from './GlobalSearch';
 import { useThemeStore } from '@/store/themeStore';
 
 export interface TopbarProps {
@@ -54,23 +55,7 @@ export function Topbar({
       </button>
 
       {/* Global search */}
-      <div className="flex-1 max-w-md hidden sm:block">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search patients, medicines..."
-            className={cn(
-              'w-full pl-9 pr-4 py-2 text-sm rounded-lg',
-              'bg-gray-100 border-0 text-gray-900 placeholder:text-gray-400',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-sm',
-              'dark:bg-slate-700 dark:text-gray-100 dark:placeholder:text-gray-500',
-              'dark:focus:bg-slate-600 dark:focus:ring-blue-400/20',
-              'transition-all duration-150'
-            )}
-          />
-        </div>
-      </div>
+      <GlobalSearch />
 
       {/* Right side actions */}
       <div className="flex items-center gap-1 ml-auto">

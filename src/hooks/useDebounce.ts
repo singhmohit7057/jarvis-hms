@@ -1,4 +1,4 @@
-// #must: Debounce hook — delays updating a value until after a specified delay
+
 import { useState, useEffect } from 'react';
 
 /**

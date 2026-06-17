@@ -1,4 +1,4 @@
-// #must: Activity logging hook — fire-and-forget inserts into activity_logs table
+
 import { useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';

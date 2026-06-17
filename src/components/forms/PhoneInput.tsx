@@ -1,6 +1,5 @@
-// #must: Phone input with +91 India prefix and 10-digit formatting
+
 import { cn } from '@/lib/utils';
-import { Phone } from 'lucide-react';
 
 export interface PhoneInputProps {
   /** Label above the field */
@@ -48,18 +47,6 @@ export function PhoneInput({
         </label>
       )}
       <div className="relative flex">
-        {/* Country prefix */}
-        <div
-          className={cn(
-            'flex items-center gap-1.5 px-3 rounded-l-lg border border-r-0 bg-gray-50 text-sm text-gray-600',
-            'dark:bg-slate-700 dark:text-gray-300',
-            error ? 'border-red-500' : 'border-gray-300 dark:border-slate-600'
-          )}
-        >
-          <Phone className="h-3.5 w-3.5" />
-          <span>+91</span>
-        </div>
-        {/* Input */}
         <input
           type="tel"
           value={formatPhone(value)}
@@ -67,7 +54,7 @@ export function PhoneInput({
           disabled={disabled}
           placeholder={placeholder}
           className={cn(
-            'flex-1 rounded-r-lg border bg-white px-3.5 py-2.5 text-sm',
+            'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm',
             'text-gray-900 placeholder:text-gray-400',
             'transition-colors duration-150',
             'focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500',

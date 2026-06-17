@@ -1,4 +1,4 @@
-// #must: Route definitions — all app routes with auth guards and role guards
+
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { ROUTES } from '@/config/routes';
@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui';
 import type { UserRole } from '@/types';
 
 // Auth pages (not lazy — small, always needed)
+import { LandingPage } from '@/features/auth/pages/LandingPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
@@ -35,6 +36,9 @@ const POSPage = lazy(() =>
 );
 const AddMedicinePage = lazy(() =>
   import('@/features/pharmacy/pages/AddMedicinePage').then((m) => ({ default: m.AddMedicinePage }))
+);
+const AddStockPage = lazy(() =>
+  import('@/features/pharmacy/pages/AddStockPage').then((m) => ({ default: m.AddStockPage }))
 );
 const SalesHistoryPage = lazy(() =>
   import('@/features/pharmacy/pages/SalesHistoryPage').then((m) => ({ default: m.SalesHistoryPage }))
@@ -120,6 +124,10 @@ const APPOINTMENT_ROLES: UserRole[] = ['super_admin', 'doctor', 'receptionist'];
 export const routes: RouteObject[] = [
   // Public routes
   {
+    path: ROUTES.LANDING,
+    element: <LandingPage />,
+  },
+  {
     path: ROUTES.LOGIN,
     element: <LoginPage />,
   },
@@ -180,6 +188,10 @@ export const routes: RouteObject[] = [
               {
                 path: ROUTES.PHARMACY_ADD_MEDICINE,
                 element: withSuspense(<AddMedicinePage />),
+              },
+              {
+                path: ROUTES.PHARMACY_ADD_STOCK,
+                element: withSuspense(<AddStockPage />),
               },
               {
                 path: ROUTES.PHARMACY_SALES,

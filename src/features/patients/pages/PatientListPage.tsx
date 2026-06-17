@@ -1,4 +1,4 @@
-// #must: Patient list page — registration modal, search, DataTable with navigation to detail
+
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
@@ -238,6 +238,8 @@ export function PatientListPage() {
               bloodGroup: (editingPatient.bloodGroup ?? '') as PatientSchemaType['bloodGroup'],
               allergies: editingPatient.allergies ?? '',
               medicalHistory: editingPatient.medicalHistory ?? '',
+              emergencyContactName: editingPatient.emergencyContactName ?? '',
+              emergencyContactPhone: editingPatient.emergencyContactPhone ?? '',
             }}
           />
         )}

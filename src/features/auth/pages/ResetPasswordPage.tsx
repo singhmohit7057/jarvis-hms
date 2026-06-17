@@ -1,4 +1,4 @@
-// #must: Reset password page — new password + confirm password form after clicking reset link
+
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';

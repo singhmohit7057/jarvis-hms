@@ -1,4 +1,4 @@
-// #must: Click-to-open dropdown menu with keyboard navigation and outside-click close
+
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';

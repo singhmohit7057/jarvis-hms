@@ -1,4 +1,4 @@
-// #must: Animated pulse placeholder for loading states
+
 import { cn } from '@/lib/utils';
 
 export interface SkeletonProps {

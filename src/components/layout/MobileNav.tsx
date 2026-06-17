@@ -1,4 +1,4 @@
-// #must: Overlay sidebar for mobile — slides in from left with backdrop
+
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,7 @@ import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NAVIGATION } from '@/config/navigation';
 import { SidebarNavItem } from './SidebarNavItem';
+import { useClinicStore } from '@/store/clinicStore';
 
 export interface MobileNavProps {
   /** Whether the mobile nav is open */
@@ -23,6 +24,8 @@ function getIconComponent(iconName: string): LucideIcon {
 }
 
 export function MobileNav({ isOpen, onClose, userRole }: MobileNavProps) {
+  const clinicName = useClinicStore((s) => s.clinicName);
+  const logoUrl = useClinicStore((s) => s.logoUrl);
   const location = useLocation();
 
   // Close when route changes
@@ -71,8 +74,14 @@ export function MobileNav({ isOpen, onClose, userRole }: MobileNavProps) {
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 dark:border-slate-700 shrink-0">
           <div className="flex items-center gap-2">
-            <Stethoscope className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-            <span className="text-xl font-bold text-gray-900 dark:text-gray-100">Jarvis</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Clinic logo" className="h-8 w-8 object-contain rounded" />
+            ) : (
+              <Stethoscope className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+            )}
+            <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              {clinicName.slice(0, 12)}
+            </span>
           </div>
           <button
             onClick={onClose}

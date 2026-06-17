@@ -1,4 +1,4 @@
-// #must: Centered empty state placeholder with icon, text, and optional action button
+
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';

@@ -1,4 +1,4 @@
-// #must: Reusable Select dropdown with label and error state, styled consistently with Input
+
 import { forwardRef, type SelectHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';

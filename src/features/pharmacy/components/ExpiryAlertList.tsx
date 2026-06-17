@@ -1,4 +1,4 @@
-// #must: Widget showing medicines expiring within 30 days, sorted by nearest expiry
+
 import { useMemo } from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
@@ -34,7 +34,7 @@ export function ExpiryAlertList({ medicines, days = 30 }: ExpiryAlertListProps) 
       for (const batch of med.batches) {
         if (batch.quantityInStock <= 0) continue;
         const expDate = new Date(batch.expiryDate);
-        if (expDate <= threshold) {
+        if (expDate >= today && expDate <= threshold) {
           const diffTime = expDate.getTime() - today.getTime();
           const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           items.push({

@@ -1,4 +1,4 @@
-// #must: Custom hook for medicine inventory CRUD operations with Supabase
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Medicine, MedicineBatch } from '@/types';
@@ -54,7 +54,10 @@ export function useInventory(): UseInventoryReturn {
         composition: item.composition ?? '',
         hsnCode: item.hsn_code,
         gstPercentage: item.gst_percentage,
-        unit: item.unit ?? 'Strip',
+        packSize: item.pack_size ?? 1,
+        looseSell: item.loose_sell ?? false,
+        reorderLevel: item.reorder_level ?? 0,
+        rackLocation: item.rack_location ?? '',
         isActive: item.is_active,
         createdAt: item.created_at,
         batches: (item.batches ?? []).map((batch: Record<string, unknown>) => ({
@@ -112,7 +115,10 @@ export function useInventory(): UseInventoryReturn {
         composition: item.composition ?? '',
         hsnCode: item.hsn_code,
         gstPercentage: item.gst_percentage,
-        unit: item.unit ?? 'Strip',
+        packSize: item.pack_size ?? 1,
+        looseSell: item.loose_sell ?? false,
+        reorderLevel: item.reorder_level ?? 0,
+        rackLocation: item.rack_location ?? '',
         isActive: item.is_active,
         createdAt: item.created_at,
         batches: (item.batches ?? []).map((batch: Record<string, unknown>) => ({
@@ -146,9 +152,12 @@ export function useInventory(): UseInventoryReturn {
         company: data.company,
         category: data.category,
         composition: data.composition,
-        hsn_code: data.hsnCode,
-        gst_percentage: data.gstPercentage,
-        unit: data.unit,
+        pack_size: data.packSize,
+        loose_sell: data.looseSell ?? false,
+        reorder_level: data.reorderLevel,
+        rack_location: data.rackLocation,
+        hsn_code: data.hsnCode ?? '',
+        gst_percentage: data.gstPercentage ?? 0,
         is_active: true,
       })
       .select('id')
@@ -165,9 +174,12 @@ export function useInventory(): UseInventoryReturn {
     if (data.company !== undefined) updatePayload.company = data.company;
     if (data.category !== undefined) updatePayload.category = data.category;
     if (data.composition !== undefined) updatePayload.composition = data.composition;
+    if (data.packSize !== undefined) updatePayload.pack_size = data.packSize;
+    if (data.looseSell !== undefined) updatePayload.loose_sell = data.looseSell;
     if (data.hsnCode !== undefined) updatePayload.hsn_code = data.hsnCode;
     if (data.gstPercentage !== undefined) updatePayload.gst_percentage = data.gstPercentage;
-    if (data.unit !== undefined) updatePayload.unit = data.unit;
+    if (data.reorderLevel !== undefined) updatePayload.reorder_level = data.reorderLevel;
+    if (data.rackLocation !== undefined) updatePayload.rack_location = data.rackLocation;
 
     const { error: updateError } = await supabase
       .from('medicines')
@@ -187,6 +199,17 @@ export function useInventory(): UseInventoryReturn {
   }, []);
 
   const addBatch = useCallback(async (medicineId: string, data: MedicineBatchFormData) => {
+    // looseSell → store pieces (strips × packSize); otherwise store units as entered
+    const { data: med } = await supabase
+      .from('medicines')
+      .select('pack_size, loose_sell')
+      .eq('id', medicineId)
+      .single();
+    const packSize = Math.max(med?.pack_size ?? 1, 1);
+    const pieces = (med?.loose_sell ?? false)
+      ? data.quantityInStock * packSize
+      : data.quantityInStock;
+
     const { error: insertError } = await supabase
       .from('medicine_batches')
       .insert({
@@ -195,11 +218,38 @@ export function useInventory(): UseInventoryReturn {
         expiry_date: data.expiryDate,
         mrp: data.mrp,
         purchase_price: data.purchasePrice,
-        selling_price: data.sellingPrice,
-        quantity_in_stock: data.quantityInStock,
+        selling_price: data.mrp,
+        quantity_in_stock: pieces,
       });
 
-    if (insertError) throw insertError;
+    if (!insertError) return;
+
+    // Batch already exists — add to existing stock
+    if (insertError.message.includes('duplicate key') || insertError.message.includes('unique constraint')) {
+      const { data: existing, error: fetchError } = await supabase
+        .from('medicine_batches')
+        .select('id, quantity_in_stock')
+        .eq('medicine_id', medicineId)
+        .eq('batch_number', data.batchNumber)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { error: updateError } = await supabase
+        .from('medicine_batches')
+        .update({
+          quantity_in_stock: existing.quantity_in_stock + pieces,
+          mrp: data.mrp,
+          purchase_price: data.purchasePrice,
+          selling_price: data.mrp,
+          expiry_date: data.expiryDate,
+        })
+        .eq('id', existing.id);
+
+      if (updateError) throw updateError;
+    } else {
+      throw insertError;
+    }
   }, []);
 
   const updateBatch = useCallback(async (id: string, data: Partial<MedicineBatchFormData>) => {
@@ -208,7 +258,6 @@ export function useInventory(): UseInventoryReturn {
     if (data.expiryDate !== undefined) updatePayload.expiry_date = data.expiryDate;
     if (data.mrp !== undefined) updatePayload.mrp = data.mrp;
     if (data.purchasePrice !== undefined) updatePayload.purchase_price = data.purchasePrice;
-    if (data.sellingPrice !== undefined) updatePayload.selling_price = data.sellingPrice;
     if (data.quantityInStock !== undefined) updatePayload.quantity_in_stock = data.quantityInStock;
 
     const { error: updateError } = await supabase
@@ -220,10 +269,11 @@ export function useInventory(): UseInventoryReturn {
   }, []);
 
   const lowStock = useCallback(
-    (threshold = 10): MedicineWithBatches[] => {
+    (threshold?: number): MedicineWithBatches[] => {
       return medicines.filter((med) => {
         const totalStock = med.batches.reduce((sum, b) => sum + b.quantityInStock, 0);
-        return totalStock > 0 && totalStock <= threshold;
+        const limit = threshold ?? med.reorderLevel;
+        return totalStock > 0 && totalStock <= limit;
       });
     },
     [medicines]

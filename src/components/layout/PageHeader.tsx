@@ -1,4 +1,4 @@
-// #must: Page title header with breadcrumbs and right-side action buttons
+
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';

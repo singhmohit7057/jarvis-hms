@@ -1,11 +1,10 @@
-// #must: Centralized route definitions — single source of truth for all app paths
-
 export const ROUTES = {
+  LANDING: '/',
   LOGIN: '/login',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
 
-  DASHBOARD: '/',
+  DASHBOARD: '/dashboard',
 
   PATIENTS: '/patients',
   PATIENT_DETAIL: '/patients/:id',
@@ -13,6 +12,7 @@ export const ROUTES = {
   PHARMACY_INVENTORY: '/pharmacy/inventory',
   PHARMACY_BILLING: '/pharmacy/billing',
   PHARMACY_ADD_MEDICINE: '/pharmacy/add-medicine',
+  PHARMACY_ADD_STOCK: '/pharmacy/add-stock',
   PHARMACY_SALES: '/pharmacy/sales',
 
   APPOINTMENTS: '/appointments',
@@ -23,6 +23,7 @@ export const ROUTES = {
   LAB_TESTS: '/lab/tests',
   LAB_REPORT_ENTRY: '/lab/report/:id',
 
+  REPORTS: '/reports',
   REPORTS_SALES: '/reports/sales',
   REPORTS_STOCK: '/reports/stock',
   REPORTS_EXPIRY: '/reports/expiry',

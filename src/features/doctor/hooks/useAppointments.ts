@@ -1,4 +1,4 @@
-// #must: Custom hook for appointment CRUD operations with Supabase
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Appointment, AppointmentStatus } from '@/types';
@@ -150,6 +150,22 @@ export function useAppointments() {
     []
   );
 
+  const updatePaymentStatus = useCallback(
+    async (id: string, paymentStatus: 'pending' | 'paid' | 'waived') => {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ payment_status: paymentStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setAppointments((prev) =>
+        prev.map((apt) => (apt.id === id ? { ...apt, paymentStatus } : apt))
+      );
+    },
+    []
+  );
+
   const cancelAppointment = useCallback(
     async (id: string) => {
       await updateAppointmentStatus(id, 'cancelled');
@@ -172,6 +188,7 @@ export function useAppointments() {
     fetchTodayAppointments,
     createAppointment,
     updateAppointmentStatus,
+    updatePaymentStatus,
     cancelAppointment,
   };
 }

@@ -1,5 +1,3 @@
-// #must: Doctor dashboard — appointment stats, today's timeline, weekly bar chart
-
 import { useMemo } from 'react';
 import {
   BarChart,
@@ -24,24 +22,28 @@ interface AppointmentStatusRow {
   fee: number;
 }
 
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function getLast7Days(): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
+    return toLocalDateStr(d);
   });
 }
 
 function getMonthRange() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const start = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+  const end = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   return { start, end };
 }
 
 export function DoctorDashboard() {
   const user = useAuthStore((s) => s.user);
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateStr(new Date());
   const { start: monthStart, end: monthEnd } = getMonthRange();
 
   // Resolve the doctor profile id for the logged-in user
@@ -125,30 +127,10 @@ export function DoctorDashboard() {
     <div className="space-y-6">
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Today's Appointments"
-          value={todayLoading ? '...' : totalToday}
-          icon={CalendarCheck}
-          color="primary"
-        />
-        <StatCard
-          title="Completed Today"
-          value={todayLoading ? '...' : completedToday}
-          icon={CheckCircle}
-          color="success"
-        />
-        <StatCard
-          title="Pending Today"
-          value={todayLoading ? '...' : pendingToday}
-          icon={Clock}
-          color="warning"
-        />
-        <StatCard
-          title="Month's Collection"
-          value={monthLoading ? '...' : formatCurrency(monthCollection)}
-          icon={IndianRupee}
-          color="primary"
-        />
+        <StatCard title="Today's Appointments" value={todayLoading ? '...' : totalToday} icon={CalendarCheck} color="primary" />
+        <StatCard title="Pending" value={todayLoading ? '...' : pendingToday} icon={Clock} color="warning" subtitle="Scheduled + In Progress" />
+        <StatCard title="Completed" value={todayLoading ? '...' : completedToday} icon={CheckCircle} color="success" />
+        <StatCard title="Month's Collection" value={monthLoading ? '...' : formatCurrency(monthCollection)} icon={IndianRupee} color="primary" />
       </div>
 
       {/* Today's appointments timeline + weekly chart */}

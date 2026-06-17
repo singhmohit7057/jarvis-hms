@@ -1,6 +1,4 @@
-// #must: Sales report page — revenue, GST, and daily trend for a selected date range
-
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   DollarSign,
@@ -41,7 +39,7 @@ export function SalesReportPage() {
   });
 
   const { data: rawSales, isLoading } = useSupabaseQuery(
-    useCallback(async () => {
+    async () => {
       const start = toDateStr(filters.startDate);
       const end = toDateStr(filters.endDate);
 
@@ -53,7 +51,8 @@ export function SalesReportPage() {
         .order('created_at', { ascending: true });
 
       return { data: data ?? [], error };
-    }, [filters])
+    },
+    [filters]
   );
 
   // Aggregate by date
@@ -140,7 +139,7 @@ export function SalesReportPage() {
         title="Sales Report"
         subtitle="Revenue, GST, and daily sales breakdown"
         breadcrumbs={[
-          { label: 'Reports', path: ROUTES.REPORTS_SALES },
+          { label: 'Reports', path: ROUTES.REPORTS },
           { label: 'Sales Report' },
         ]}
       />

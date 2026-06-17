@@ -1,7 +1,7 @@
-// #must: User avatar dropdown with profile link, settings, and logout
+
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Settings, LogOut } from 'lucide-react';
+import { Building2, Users, ActivitySquare, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -61,25 +61,35 @@ export function ProfileDropdown({ userName, userRole, avatarUrl, onLogout }: Pro
             </Badge>
           </div>
 
-          {/* Menu items */}
-          <div className="py-1">
-            <Link
-              to="/profile"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              <User className="h-4 w-4 text-gray-400" />
-              Profile
-            </Link>
-            <Link
-              to="/settings"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              <Settings className="h-4 w-4 text-gray-400" />
-              Settings
-            </Link>
-          </div>
+          {/* Menu items — admin only */}
+          {userRole === 'super_admin' && (
+            <div className="py-1">
+              <Link
+                to="/settings/clinic"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Building2 className="h-4 w-4 text-gray-400" />
+                Clinic Details
+              </Link>
+              <Link
+                to="/settings/users"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Users className="h-4 w-4 text-gray-400" />
+                User Management
+              </Link>
+              <Link
+                to="/activity-log"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <ActivitySquare className="h-4 w-4 text-gray-400" />
+                Activity Log
+              </Link>
+            </div>
+          )}
 
           {/* Logout */}
           <div className="border-t border-gray-100 dark:border-slate-700 py-1">

@@ -1,4 +1,4 @@
-// #must: Full inventory management page with tabs, search, and medicine table
+
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
@@ -12,8 +12,9 @@ import { ROUTES } from '@/config/routes';
 import { useInventory } from '../hooks/useInventory';
 import type { MedicineWithBatches } from '../hooks/useInventory';
 import { InventoryTable } from '../components/InventoryTable';
-import { StockAdjustForm } from '../components/StockAdjustForm';
-import type { MedicineBatch } from '@/types';
+import { MedicineForm } from '../components/MedicineForm';
+import { AddBatchModal } from '../components/AddBatchModal';
+import type { MedicineBatchFormData, MedicineFormData, MedicineWithBatchFormData } from '../schemas/medicine.schema';
 
 const TABS = [
   { id: 'all', label: 'All Medicines' },
@@ -29,22 +30,22 @@ export function InventoryPage() {
     isLoading,
     fetchMedicines,
     deleteMedicine,
-    updateBatch,
+    addBatch,
+    updateMedicine,
     lowStock,
     expired,
     nearExpiry,
   } = useInventory();
 
   const [activeTab, setActiveTab] = useState('all');
-  const [batchTarget, setBatchTarget] = useState<{
-    medicine: MedicineWithBatches;
-    batch: MedicineBatch | null;
-  } | null>(null);
+  const [editTarget, setEditTarget] = useState<MedicineWithBatches | null>(null);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [addBatchTarget, setAddBatchTarget] = useState<MedicineWithBatches | null>(null);
 
   const getFilteredData = useCallback((): MedicineWithBatches[] => {
     switch (activeTab) {
       case 'low_stock':
-        return lowStock(10);
+        return lowStock();
       case 'expired':
         return expired();
       case 'near_expiry':
@@ -55,16 +56,38 @@ export function InventoryPage() {
   }, [activeTab, medicines, lowStock, expired, nearExpiry]);
 
   const handleEdit = (medicine: MedicineWithBatches) => {
-    navigate(`${ROUTES.PHARMACY_INVENTORY}/edit/${medicine.id}`);
+    setEditTarget(medicine);
+  };
+
+  const handleEditSubmit = async (data: MedicineWithBatchFormData | MedicineFormData) => {
+    if (!editTarget) return;
+    setIsEditSubmitting(true);
+    try {
+      await updateMedicine(editTarget.id, data as MedicineFormData);
+      toast.success('Medicine updated successfully');
+      setEditTarget(null);
+      await fetchMedicines();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update medicine';
+      toast.error(message);
+    } finally {
+      setIsEditSubmitting(false);
+    }
   };
 
   const handleAddBatch = (medicine: MedicineWithBatches) => {
-    if (medicine.batches.length === 1) {
-      // Only one batch — skip selection and go straight to the adjust form
-      setBatchTarget({ medicine, batch: medicine.batches[0] });
-    } else {
-      // Multiple batches — show selection step first
-      setBatchTarget({ medicine, batch: null });
+    setAddBatchTarget(medicine);
+  };
+
+  const handleAddBatchSubmit = async (medicineId: string, data: MedicineBatchFormData) => {
+    try {
+      await addBatch(medicineId, data);
+      toast.success('Batch added successfully');
+      setAddBatchTarget(null);
+      fetchMedicines();
+    } catch (err) {
+      const message = (err as { message?: string })?.message || 'Failed to add batch';
+      toast.error(message);
     }
   };
 
@@ -78,25 +101,6 @@ export function InventoryPage() {
       toast.error(message);
     }
   };
-
-  const handleBatchSubmit = async (batchId: string, newQuantity: number) => {
-    try {
-      await updateBatch(batchId, { quantityInStock: newQuantity });
-      toast.success('Stock adjusted successfully');
-      setBatchTarget(null);
-      await fetchMedicines();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to adjust stock';
-      toast.error(message);
-    }
-  };
-
-  const handleBatchSelect = (batch: MedicineBatch) => {
-    if (batchTarget) {
-      setBatchTarget({ medicine: batchTarget.medicine, batch });
-    }
-  };
-
   return (
     <div>
       <PageHeader
@@ -128,52 +132,42 @@ export function InventoryPage() {
         </div>
       </Card>
 
-      {/* Batch Selection Modal — shown when medicine has multiple batches and none selected yet */}
-      {batchTarget && batchTarget.batch === null && (
-        <Modal
-          isOpen
-          onClose={() => setBatchTarget(null)}
-          title={`Select Batch — ${batchTarget.medicine.name}`}
-          size="md"
-        >
-          <div className="space-y-2">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              This medicine has multiple batches. Select the batch you want to adjust.
-            </p>
-            {batchTarget.medicine.batches.map((batch) => (
-              <button
-                key={batch.id}
-                onClick={() => handleBatchSelect(batch)}
-                className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100 font-mono text-sm">
-                      {batch.batchNumber}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Expiry: {batch.expiryDate}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {batch.quantityInStock} units
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </Modal>
+      {/* Add New Batch Modal */}
+      {addBatchTarget && (
+        <AddBatchModal
+          medicine={addBatchTarget}
+          onSubmit={handleAddBatchSubmit}
+          onClose={() => setAddBatchTarget(null)}
+        />
       )}
 
-      {/* Stock Adjust Modal — shown once a specific batch is selected */}
-      {batchTarget && batchTarget.batch !== null && (
-        <StockAdjustForm
-          batch={batchTarget.batch}
-          onSubmit={handleBatchSubmit}
-          onClose={() => setBatchTarget(null)}
-        />
+      {/* Edit Medicine Modal */}
+      {editTarget && (
+        <Modal
+          isOpen={!!editTarget}
+          onClose={() => setEditTarget(null)}
+          title={`Edit Medicine — ${editTarget.name}`}
+          size="xl"
+        >
+          <MedicineForm
+            isEditMode
+            defaultValues={{
+              name: editTarget.name,
+              genericName: editTarget.genericName ?? '',
+              category: editTarget.category,
+              company: editTarget.company ?? '',
+              composition: editTarget.composition ?? '',
+              packSize: editTarget.packSize ?? 1,
+              looseSell: editTarget.looseSell ?? false,
+              hsnCode: editTarget.hsnCode ?? '',
+              gstPercentage: editTarget.gstPercentage ?? 0,
+              reorderLevel: editTarget.reorderLevel ?? 0,
+              rackLocation: editTarget.rackLocation ?? '',
+            }}
+            onSubmit={handleEditSubmit}
+            isLoading={isEditSubmitting}
+          />
+        </Modal>
       )}
     </div>
   );

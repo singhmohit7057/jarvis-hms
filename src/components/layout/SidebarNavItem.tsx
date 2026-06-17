@@ -1,4 +1,4 @@
-// #must: Single sidebar navigation item with icon, label, active state, and collapsed mode
+
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';

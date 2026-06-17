@@ -1,15 +1,16 @@
-// #must: Add/Edit user form with react-hook-form — name, email, phone, role, active status
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { FormField } from '@/components/forms/FormField';
-import { Button, Alert } from '@/components/ui';
+import { Button } from '@/components/ui';
 import type { SelectOption } from '@/components/ui';
 import { USER_ROLES } from '@/config/constants';
 
 const addUserSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
   email: z.string().email('Enter a valid email').max(150),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
   phone: z
     .string()
     .min(10, 'Enter a valid 10-digit phone number')
@@ -53,6 +54,7 @@ export function UserForm({ onSubmit, defaultValues, isLoading = false, mode }: U
     defaultValues: {
       name: defaultValues?.name ?? '',
       email: defaultValues?.email ?? '',
+      password: '',
       phone: defaultValues?.phone ?? '',
       role: defaultValues?.role ?? USER_ROLES.RECEPTIONIST,
       is_active: defaultValues?.is_active ?? true,
@@ -65,17 +67,6 @@ export function UserForm({ onSubmit, defaultValues, isLoading = false, mode }: U
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-      {mode === 'add' && (
-        <Alert variant="info">
-          <p className="text-sm font-medium mb-1">Before adding a profile:</p>
-          <p className="text-sm">
-            Go to your{' '}
-            <strong>Supabase Dashboard → Authentication → Users → Invite User</strong>, create the
-            auth account first, then fill in their profile details below.
-          </p>
-        </Alert>
-      )}
-
       <FormField
         control={control}
         name="name"
@@ -91,6 +82,16 @@ export function UserForm({ onSubmit, defaultValues, isLoading = false, mode }: U
         placeholder="user@clinic.com"
         disabled={mode === 'edit'}
       />
+
+      {mode === 'add' && (
+        <FormField
+          control={control}
+          name="password"
+          label="Password"
+          type="password"
+          placeholder="Min. 8 characters"
+        />
+      )}
 
       <FormField
         control={control}

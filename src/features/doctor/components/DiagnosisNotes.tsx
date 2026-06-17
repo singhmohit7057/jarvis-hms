@@ -1,4 +1,4 @@
-// #must: Symptoms, diagnosis, and notes textarea section for consultation form
+
 import { Controller, type Control } from 'react-hook-form';
 import { Textarea } from '@/components/ui/Textarea';
 import type { ConsultationFormData } from '../schemas/prescription.schema';

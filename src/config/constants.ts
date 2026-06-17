@@ -1,6 +1,4 @@
-// #must: Application-wide constants — roles, statuses, enums, and clinic metadata
 
-// #must: Use const object instead of enum — enum is not allowed with erasableSyntaxOnly
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
   PHARMACIST: 'pharmacist',
@@ -17,11 +15,11 @@ export const APPOINTMENT_STATUS = ['scheduled', 'in_progress', 'completed', 'can
 
 export const LAB_STATUS = ['booked', 'sample_collected', 'processing', 'completed', 'delivered'] as const;
 
-export const PAYMENT_STATUS = ['pending', 'paid', 'refunded'] as const;
-
+export const PAYMENT_STATUS = ['pending', 'paid', 'refunded', 'waived'] as const;
 export const MEDICINE_CATEGORIES = [
   'Tablet',
   'Capsule',
+  'Strip',
   'Syrup',
   'Injection',
   'Cream',

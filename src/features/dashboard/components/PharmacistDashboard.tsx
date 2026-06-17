@@ -1,5 +1,3 @@
-// #must: Pharmacist dashboard — sales stats, revenue chart, low stock + near expiry tables
-
 import { useMemo } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { IndianRupee, ShoppingBag, AlertTriangle, CalendarX } from 'lucide-react';
@@ -38,18 +36,37 @@ function getLast7Days(): string[] {
   });
 }
 
+function localStartOf(dateStr: string): string {
+  const offset = -new Date().getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+  return `${dateStr}T00:00:00${sign}${hh}:${mm}`;
+}
+function localEndOf(dateStr: string): string {
+  const offset = -new Date().getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+  return `${dateStr}T23:59:59${sign}${hh}:${mm}`;
+}
+function toLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function PharmacistDashboard() {
-  const today = new Date().toISOString().split('T')[0];
+  const _now = new Date();
+  const today = toLocalDate(_now);
   const sevenDaysAgo = getLast7Days()[0];
-  const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const thirtyDaysLater = toLocalDate(new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() + 30));
 
   const { data: todaySales, isLoading: salesLoading } = useSupabaseQuery<{ grand_total: number }>(
     async () =>
       supabase
         .from('sales')
         .select('grand_total')
-        .gte('created_at', `${today}T00:00:00`)
-        .lte('created_at', `${today}T23:59:59`),
+        .gte('created_at', localStartOf(today))
+        .lte('created_at', localEndOf(today)),
     [today]
   );
 
@@ -58,19 +75,20 @@ export function PharmacistDashboard() {
       supabase
         .from('sales')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', `${today}T00:00:00`)
-        .lte('created_at', `${today}T23:59:59`),
+        .gte('created_at', localStartOf(today))
+        .lte('created_at', localEndOf(today)),
     [today]
   );
 
-  const { count: lowStockCount, isLoading: stockLoading } = useSupabaseQuery<unknown>(
+  const { data: lowStockCountRaw, isLoading: stockLoading } = useSupabaseQuery<{ quantity_in_stock: number; medicines: { reorder_level: number } | null }>(
     async () =>
-      supabase
+      (supabase
         .from('medicine_batches')
-        .select('id', { count: 'exact', head: true })
-        .lt('quantity_in_stock', 10),
+        .select('quantity_in_stock, medicines(reorder_level)')
+        .gte('quantity_in_stock', 0)) as never,
     []
   );
+  const lowStockCount = lowStockCountRaw.filter((b) => b.quantity_in_stock <= (b.medicines?.reorder_level ?? 0)).length;
 
   const { count: nearExpiryCount, isLoading: expiryLoading } = useSupabaseQuery<unknown>(
     async () =>
@@ -89,7 +107,7 @@ export function PharmacistDashboard() {
       supabase
         .from('sales')
         .select('created_at, grand_total')
-        .gte('created_at', `${sevenDaysAgo}T00:00:00`)
+        .gte('created_at', localStartOf(sevenDaysAgo))
         .order('created_at', { ascending: true }),
     [sevenDaysAgo]
   );
@@ -100,29 +118,42 @@ export function PharmacistDashboard() {
     return days.map((date) => ({
       date,
       revenue: chartSales
-        .filter((s) => (s.created_at as string).startsWith(date))
+        .filter((s) => toLocalDate(new Date(s.created_at)) === date)
         .reduce((sum, s) => sum + (s.grand_total ?? 0), 0),
     }));
   }, [chartSales, days]);
 
   // Low stock table
-  const { data: lowStockData, isLoading: lowStockLoading } = useSupabaseQuery<LowStockRow>(
+  const { data: lowStockRaw, isLoading: lowStockLoading } = useSupabaseQuery<Record<string, unknown>>(
     async () =>
       supabase
         .from('medicine_batches')
-        .select('id, medicine_name, batch_number, quantity_in_stock, expiry_date')
-        .lt('quantity_in_stock', 10)
-        .order('quantity_in_stock', { ascending: true })
-        .limit(10),
+        .select('id, batch_number, quantity_in_stock, expiry_date, medicines(name, reorder_level)')
+        .gte('quantity_in_stock', 0)
+        .order('quantity_in_stock', { ascending: true }),
     []
   );
+  const lowStockData: LowStockRow[] = lowStockRaw
+    .filter((r) => {
+      const qty = r.quantity_in_stock as number;
+      const reorder = (r.medicines as { reorder_level: number } | null)?.reorder_level ?? 0;
+      return qty <= reorder;
+    })
+    .slice(0, 10)
+    .map((r) => ({
+    id: r.id as string,
+    medicine_name: (r.medicines as { name: string } | null)?.name ?? '—',
+    batch_number: r.batch_number as string,
+    quantity_in_stock: r.quantity_in_stock as number,
+    expiry_date: r.expiry_date as string,
+  }));
 
   // Near expiry table
-  const { data: nearExpiryData, isLoading: nearExpiryLoading } = useSupabaseQuery<NearExpiryRow>(
+  const { data: nearExpiryRaw, isLoading: nearExpiryLoading } = useSupabaseQuery<Record<string, unknown>>(
     async () =>
       supabase
         .from('medicine_batches')
-        .select('id, medicine_name, batch_number, quantity_in_stock, expiry_date')
+        .select('id, batch_number, quantity_in_stock, expiry_date, medicines(name)')
         .lte('expiry_date', thirtyDaysLater)
         .gte('expiry_date', today)
         .gt('quantity_in_stock', 0)
@@ -130,6 +161,13 @@ export function PharmacistDashboard() {
         .limit(10),
     [today, thirtyDaysLater]
   );
+  const nearExpiryData: NearExpiryRow[] = nearExpiryRaw.map((r) => ({
+    id: r.id as string,
+    medicine_name: (r.medicines as { name: string } | null)?.name ?? '—',
+    batch_number: r.batch_number as string,
+    quantity_in_stock: r.quantity_in_stock as number,
+    expiry_date: r.expiry_date as string,
+  }));
 
   const todayRevenue = todaySales.reduce((sum, s) => sum + (s.grand_total ?? 0), 0);
 

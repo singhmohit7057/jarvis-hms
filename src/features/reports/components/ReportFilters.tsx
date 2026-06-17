@@ -1,4 +1,4 @@
-// #must: Reusable report filter bar with date range, quick presets, and extra filter slot
+
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { DatePickerField } from '@/components/forms/DatePickerField';
@@ -16,6 +16,10 @@ export interface ReportFiltersProps {
   extraFilters?: ReactNode;
   /** Whether to show date range pickers (default true) */
   showDateRange?: boolean;
+  /** Default preset on first render (default: 'this_month') */
+  defaultPreset?: PresetKey;
+  /** Auto-apply immediately when a preset button is clicked (default false) */
+  autoApplyPresets?: boolean;
 }
 
 type PresetKey = 'today' | 'this_week' | 'this_month' | 'last_month' | 'custom';
@@ -48,13 +52,10 @@ function getPresetDates(preset: PresetKey): { start: Date; end: Date } {
   }
 }
 
-export function ReportFilters({ onFilter, extraFilters, showDateRange = true }: ReportFiltersProps) {
-  const [startDate, setStartDate] = useState<Date | null>(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
-  const [endDate, setEndDate] = useState<Date | null>(new Date());
-  const [activePreset, setActivePreset] = useState<PresetKey>('this_month');
+export function ReportFilters({ onFilter, extraFilters, showDateRange = true, defaultPreset = 'this_month', autoApplyPresets = false }: ReportFiltersProps) {
+  const [startDate, setStartDate] = useState<Date | null>(() => getPresetDates(defaultPreset).start);
+  const [endDate, setEndDate] = useState<Date | null>(() => getPresetDates(defaultPreset).end);
+  const [activePreset, setActivePreset] = useState<PresetKey>(defaultPreset);
 
   const presets: { key: PresetKey; label: string }[] = [
     { key: 'today', label: 'Today' },
@@ -70,6 +71,9 @@ export function ReportFilters({ onFilter, extraFilters, showDateRange = true }: 
       const { start, end } = getPresetDates(preset);
       setStartDate(start);
       setEndDate(end);
+      if (autoApplyPresets) {
+        onFilter({ startDate: start, endDate: end });
+      }
     }
   };
 
@@ -80,10 +84,10 @@ export function ReportFilters({ onFilter, extraFilters, showDateRange = true }: 
   };
 
   const handleReset = () => {
-    const { start, end } = getPresetDates('this_month');
+    const { start, end } = getPresetDates(defaultPreset);
     setStartDate(start);
     setEndDate(end);
-    setActivePreset('this_month');
+    setActivePreset(defaultPreset);
     onFilter({ startDate: start, endDate: end });
   };
 
@@ -120,7 +124,6 @@ export function ReportFilters({ onFilter, extraFilters, showDateRange = true }: 
                   setStartDate(date);
                   setActivePreset('custom');
                 }}
-                maxDate={endDate ?? undefined}
                 placeholder="Start date"
               />
             </div>
@@ -133,7 +136,6 @@ export function ReportFilters({ onFilter, extraFilters, showDateRange = true }: 
                   setActivePreset('custom');
                 }}
                 minDate={startDate ?? undefined}
-                maxDate={new Date()}
                 placeholder="End date"
               />
             </div>

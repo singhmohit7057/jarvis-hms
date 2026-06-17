@@ -1,4 +1,4 @@
-// #must: Generate prescription PDF using jsPDF — clinic header, Rx symbol, patient info, medicine table
+
 import { jsPDF } from 'jspdf';
 import { CLINIC_INFO } from '@/config/constants';
 import { formatDate } from '@/lib/formatters';
@@ -8,207 +8,244 @@ interface PrescriptionPDFData extends Omit<Prescription, 'patient' | 'doctor'> {
   patient: Patient;
   doctor: Doctor;
   items: PrescriptionItem[];
+  symptoms?: string;
+  clinicalNotes?: string;
 }
 
 export function generatePrescriptionPDF(
   prescription: PrescriptionPDFData,
   vitals?: Vitals
 ): jsPDF {
-  const doc = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 15;
-  const contentWidth = pageWidth - margin * 2;
-  let y = margin;
+  // A5 portrait: 148 × 210 mm
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+  const PW = 148;
+  const PH = 210;
+  const ML = 8;
+  const MT = 6;
+  const TW = PW - ML * 2;
+  let y = MT;
 
-  // --- Clinic Header ---
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(CLINIC_INFO.name, pageWidth / 2, y, { align: 'center' });
-  y += 6;
+  const set = (size: number, style: 'normal' | 'bold' | 'italic' = 'normal') => {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style);
+    doc.setTextColor(0);
+  };
+  const hl = (yy: number, lw = 0.2) => {
+    doc.setDrawColor(0); doc.setLineWidth(lw);
+    doc.line(ML, yy, ML + TW, yy);
+  };
+  const grayRect = (x: number, yy: number, w: number, h: number) => {
+    doc.setFillColor(235, 235, 235);
+    doc.setDrawColor(0); doc.setLineWidth(0.2);
+    doc.rect(x, yy, w, h, 'F');
+  };
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text(CLINIC_INFO.address, pageWidth / 2, y, { align: 'center' });
-  y += 4;
-  doc.text(`Phone: ${CLINIC_INFO.phone} | Email: ${CLINIC_INFO.email}`, pageWidth / 2, y, {
-    align: 'center',
-  });
-  y += 6;
+  // ── outer border ────────────────────────────────────────────────────────────
+  doc.setDrawColor(0); doc.setLineWidth(0.4);
+  doc.rect(ML, MT, TW, PH - MT * 2, 'S');
 
-  // Doctor info
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Dr. ${prescription.doctor.name}`, margin, y);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  const doctorInfo = `${prescription.doctor.qualification} | ${prescription.doctor.specialization}`;
-  doc.text(doctorInfo, margin, y + 4);
-  doc.text(`Reg. No: ${prescription.doctor.registrationNo}`, margin, y + 8);
+  // ── clinic header ───────────────────────────────────────────────────────────
+  set(12, 'bold');
+  doc.text(CLINIC_INFO.name, PW / 2, y + 7, { align: 'center' });
+  set(7);
+  doc.text(CLINIC_INFO.address, PW / 2, y + 12, { align: 'center' });
+  doc.text(`Ph: ${CLINIC_INFO.phone}  |  ${CLINIC_INFO.email}`, PW / 2, y + 16, { align: 'center' });
+  y += 19;
+  hl(y, 0.3);
+  y += 3;
 
-  // Prescription number on the right
-  doc.setFontSize(9);
-  doc.text(`Rx No: ${prescription.prescriptionNo}`, pageWidth - margin, y, { align: 'right' });
-  doc.text(`Date: ${formatDate(prescription.createdAt)}`, pageWidth - margin, y + 4, {
-    align: 'right',
-  });
-  y += 14;
+  // ── doctor info (left) | Rx meta (right) ────────────────────────────────────
+  const MID = ML + TW / 2;
+  set(9, 'bold');
+  doc.text(`Dr. ${prescription.doctor.name}`, ML + 2, y + 4);
+  set(7);
+  doc.text(`${prescription.doctor.qualification}  |  ${prescription.doctor.specialization}`, ML + 2, y + 8.5);
+  doc.text(`Reg. No: ${prescription.doctor.registrationNo}`, ML + 2, y + 13);
 
-  // Horizontal line
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 6;
+  const RR = ML + TW - 2;
+  set(7);
+  doc.text('Rx No', MID + 2, y + 4);
+  set(7, 'bold'); doc.text(prescription.prescriptionNo, RR, y + 4, { align: 'right' });
+  set(7);
+  doc.text('Date', MID + 2, y + 9);
+  doc.text(formatDate(prescription.createdAt), RR, y + 9, { align: 'right' });
 
-  // --- Patient Info ---
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Patient:', margin, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(
-    `${prescription.patient.name} | ${prescription.patient.age} yrs / ${prescription.patient.gender}`,
-    margin + 17,
-    y
+  y += 17;
+  hl(y, 0.3);
+  y += 3;
+
+  // ── patient row ─────────────────────────────────────────────────────────────
+  set(8, 'bold'); doc.text('Patient:', ML + 2, y + 4);
+  set(8); doc.text(
+    `${prescription.patient.name}  |  ${prescription.patient.age} yrs / ${prescription.patient.gender}`,
+    ML + 18, y + 4
   );
-
   if (prescription.patient.phone) {
-    doc.text(`Phone: ${prescription.patient.phone}`, pageWidth - margin, y, { align: 'right' });
+    set(7); doc.text(`Ph: ${prescription.patient.phone}`, RR, y + 4, { align: 'right' });
   }
-  y += 6;
+  y += 8;
 
-  // --- Vitals line ---
+  // ── vitals — two-row table: label row + value row ───────────────────────────
   if (vitals) {
-    const vitalParts: string[] = [];
-    if (vitals.bp) vitalParts.push(`BP: ${vitals.bp}`);
-    if (vitals.pulse) vitalParts.push(`Pulse: ${vitals.pulse}`);
-    if (vitals.temp) vitalParts.push(`Temp: ${vitals.temp}°F`);
-    if (vitals.weight) vitalParts.push(`Wt: ${vitals.weight}kg`);
-    if (vitals.spo2) vitalParts.push(`SpO2: ${vitals.spo2}%`);
+    const vItems: { label: string; value: string }[] = [];
+    if (vitals.bp)     vItems.push({ label: 'BP (mmHg)',  value: vitals.bp });
+    if (vitals.pulse)  vItems.push({ label: 'Pulse/min',  value: vitals.pulse });
+    if (vitals.temp)   vItems.push({ label: 'Temp (°F)',  value: vitals.temp });
+    if (vitals.weight) vItems.push({ label: 'Wt (kg)',    value: vitals.weight });
+    if (vitals.height) vItems.push({ label: 'Ht (cm)',    value: vitals.height });
+    if (vitals.spo2)   vItems.push({ label: 'SpO2 (%)',   value: vitals.spo2 });
 
-    if (vitalParts.length > 0) {
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.text(`Vitals: ${vitalParts.join(' | ')}`, margin, y);
-      y += 5;
+    if (vItems.length) {
+      const BW = TW / vItems.length;
+      const LH = 5;   // label row height
+      const VH = 7;   // value row height
+
+      // label row — dark gray bg
+      doc.setFillColor(70, 70, 70);
+      doc.rect(ML, y, TW, LH, 'F');
+      set(5.5, 'bold'); doc.setTextColor(255);
+      vItems.forEach((v, i) => {
+        const bx = ML + i * BW;
+        doc.text(v.label, bx + BW / 2, y + 3.5, { align: 'center' });
+      });
+
+      // value row — light bg
+      doc.setFillColor(245, 247, 250);
+      doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.2);
+      doc.rect(ML, y + LH, TW, VH, 'FD');
+      set(9, 'bold'); doc.setTextColor(0);
+      vItems.forEach((v, i) => {
+        const bx = ML + i * BW;
+        if (i > 0) {
+          doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.2);
+          doc.line(bx, y + LH, bx, y + LH + VH);
+        }
+        doc.text(v.value, bx + BW / 2, y + LH + 5, { align: 'center' });
+      });
+
+      doc.setTextColor(0);
+      y += LH + VH + 2;
     }
   }
 
-  // --- Rx Symbol + Diagnosis ---
+  hl(y, 0.2);
+  y += 3;
+
+  // ── symptoms ────────────────────────────────────────────────────────────────
+  if (prescription.symptoms?.trim()) {
+    set(7, 'bold'); doc.text('Symptoms:', ML + 2, y);
+    set(7);
+    const sLines = doc.splitTextToSize(prescription.symptoms.trim(), TW - 26);
+    doc.text(sLines, ML + 22, y);
+    y += sLines.length * 4 + 2;
+  }
+
+  // ── diagnosis ───────────────────────────────────────────────────────────────
+  set(8, 'bold');  doc.text('Diagnosis:', ML + 2, y + 4);
+  set(8);          doc.text(prescription.diagnosis ?? '', ML + 24, y + 4, { maxWidth: TW - 26 });
+  y += 10;
+  hl(y, 0.2);
   y += 2;
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Rx', margin, y);
-  y += 2;
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Diagnosis: ', margin + 12, y - 4);
-  doc.setFont('helvetica', 'normal');
-  doc.text(prescription.diagnosis, margin + 34, y - 4);
-  y += 6;
+  // ── medicine table ──────────────────────────────────────────────────────────
+  // cols: # | Medicine | Dosage | Frequency | Duration | Timing | Notes
+  const C_W = [6, 34, 16, 20, 16, 20, TW - 112] as const;
+  const C_H = ['#', 'Medicine', 'Dosage', 'Frequency', 'Duration', 'Timing', 'Notes'];
+  const THH = 5.5;
 
-  // --- Medicine Table ---
-  const colWidths = [8, 50, 20, 22, 22, 26, contentWidth - 148];
-  const headers = ['#', 'Medicine', 'Dosage', 'Frequency', 'Duration', 'Timing', 'Instructions'];
+  grayRect(ML, y, TW, THH);
+  set(6, 'bold');
+  let cx = ML + 1;
+  for (let i = 0; i < C_H.length; i++) {
+    doc.text(C_H[i], cx, y + 3.8);
+    cx += C_W[i];
+  }
+  y += THH;
 
-  // Table header
-  doc.setFillColor(240, 240, 240);
-  doc.rect(margin, y - 1, contentWidth, 7, 'F');
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-
-  let xPos = margin + 1;
-  headers.forEach((header, idx) => {
-    doc.text(header, xPos, y + 3.5);
-    xPos += colWidths[idx];
-  });
-  y += 9;
-
-  // Table rows
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.1);
 
   prescription.items.forEach((item, idx) => {
-    // Check if we need a new page
-    if (y > 260) {
-      doc.addPage();
-      y = margin;
-    }
+    const RH = 6;
+    if (y > PH - MT - 30) { doc.addPage(); y = MT + 4; }
 
-    xPos = margin + 1;
-    const rowData = [
+    set(7);
+    cx = ML + 1;
+    const row = [
       String(idx + 1),
       item.medicineName,
-      item.dosage,
+      item.dosage === '-' ? '' : (item.dosage ?? ''),
       item.frequency,
       item.duration,
-      item.timing || '-',
-      item.instructions || '-',
+      item.timing || '',
+      item.instructions || '',
     ];
-
-    rowData.forEach((text, colIdx) => {
-      const maxWidth = colWidths[colIdx] - 2;
-      const truncated =
-        doc.getTextWidth(text) > maxWidth
-          ? text.substring(0, Math.floor((maxWidth / doc.getTextWidth(text)) * text.length)) + '..'
-          : text;
-      doc.text(truncated, xPos, y);
-      xPos += colWidths[colIdx];
+    row.forEach((txt, ci) => {
+      const mw = C_W[ci] - 1.5;
+      const lines = doc.splitTextToSize(txt, mw);
+      doc.text(lines[0] ?? '', cx, y + 4);
+      cx += C_W[ci];
     });
 
-    y += 6;
-
-    // Light separator
-    doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.1);
-    doc.line(margin, y - 2, pageWidth - margin, y - 2);
+    doc.line(ML, y + RH, ML + TW, y + RH);
+    y += RH;
   });
 
   y += 4;
 
-  // --- Advice ---
-  if (prescription.advice) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Advice:', margin, y);
-    doc.setFont('helvetica', 'normal');
-    const adviceLines = doc.splitTextToSize(prescription.advice, contentWidth - 20);
-    doc.text(adviceLines, margin + 16, y);
-    y += adviceLines.length * 4 + 4;
+  // ── advice ──────────────────────────────────────────────────────────────────
+  // strip any embedded "Follow-up: ..." line that may have been saved in old records
+  const rawAdvice = prescription.advice ?? '';
+  const adviceLines2 = rawAdvice.split('\n');
+  let embeddedFollowup = '';
+  const cleanAdvice = adviceLines2.filter((l) => {
+    const m = l.match(/^Follow-up:\s*(.+)/i);
+    if (m) { embeddedFollowup = m[1]; return false; }
+    return true;
+  }).join('\n').trim();
+
+  if (cleanAdvice) {
+    set(8, 'bold'); doc.text('Advice:', ML + 2, y);
+    set(8);
+    const lines = doc.splitTextToSize(cleanAdvice, TW - 24);
+    doc.text(lines, ML + 20, y);
+    y += lines.length * 4 + 3;
   }
 
-  // --- Follow-up ---
-  if (prescription.followupDate) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Follow-up:', margin, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(prescription.followupDate, margin + 22, y);
-    y += 8;
+  // ── follow-up — bold, separate line ─────────────────────────────────────────
+  const followupText = (prescription.followupDate
+    ? String(prescription.followupDate).replace(/^Follow-up:\s*/i, '')
+    : embeddedFollowup
+  ).trim();
+
+  if (followupText) {
+    set(8, 'bold'); doc.text('Follow-up:', ML + 2, y);
+    set(8, 'bold'); doc.setTextColor(30, 80, 180);
+    doc.text(followupText, ML + 22, y);
+    doc.setTextColor(0);
+    y += 6;
   }
 
-  // --- Doctor Signature ---
-  const signatureY = Math.max(y + 20, 250);
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.3);
-  doc.line(pageWidth - margin - 50, signatureY, pageWidth - margin, signatureY);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Dr. ${prescription.doctor.name}`, pageWidth - margin - 25, signatureY + 5, {
-    align: 'center',
-  });
-  doc.setFontSize(7);
-  doc.text(prescription.doctor.qualification, pageWidth - margin - 25, signatureY + 9, {
-    align: 'center',
-  });
+  // ── clinical notes ───────────────────────────────────────────────────────────
+  if (prescription.clinicalNotes?.trim()) {
+    set(7, 'bold'); doc.text('Notes:', ML + 2, y);
+    set(7); doc.setTextColor(80);
+    const nLines = doc.splitTextToSize(prescription.clinicalNotes.trim(), TW - 20);
+    doc.text(nLines, ML + 16, y);
+    doc.setTextColor(0);
+    y += nLines.length * 4 + 3;
+  }
 
-  // --- Footer ---
-  const footerY = doc.internal.pageSize.getHeight() - 10;
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(128);
-  doc.text('This is a computer-generated prescription.', pageWidth / 2, footerY, {
-    align: 'center',
-  });
+  // ── signature — flows right after content ───────────────────────────────────
+  y += 6;
+  const sigX = ML + TW - 44;
+  doc.setDrawColor(0); doc.setLineWidth(0.3);
+  doc.line(sigX, y, ML + TW - 2, y);
+  set(8); doc.text(`Dr. ${prescription.doctor.name}`, sigX + 21, y + 4, { align: 'center' });
+  set(6); doc.text(prescription.doctor.qualification, sigX + 21, y + 8, { align: 'center' });
+
+  // ── footer ───────────────────────────────────────────────────────────────────
+  set(6, 'italic'); doc.setTextColor(140);
+  doc.text('This is a computer-generated prescription.', PW / 2, PH - MT - 1, { align: 'center' });
 
   return doc;
 }

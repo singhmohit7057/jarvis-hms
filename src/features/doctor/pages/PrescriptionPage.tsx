@@ -1,8 +1,8 @@
-// #must: Prescriptions list page with search, date filter, view modal, and PDF download
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
-import { Eye, Download, Printer, FileText } from 'lucide-react';
+import { Eye, Download, Printer, FileText } from 'lucide-react'; // Download kept for modal
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
@@ -13,6 +13,7 @@ import { DatePickerField } from '@/components/forms/DatePickerField';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/formatters';
 import { generatePrescriptionPDF } from '@/lib/pdf/prescription.pdf';
+import { generateReceiptPDF, fetchReceiptClinic } from '@/lib/pdf/receipt.pdf';
 import type { Prescription, PrescriptionItem, Patient, Doctor, Vitals } from '@/types';
 
 interface PrescriptionRow extends Prescription {
@@ -54,7 +55,7 @@ export function PrescriptionPage() {
         doctorId: row.doctor_id,
         diagnosis: row.diagnosis,
         advice: row.advice ?? '',
-        followupDate: row.followup_date ?? undefined,
+        followupDate: row.followup_note ?? row.followup_date ?? undefined,
         createdAt: row.created_at,
         patient: {
           id: row.patient.id,
@@ -117,22 +118,24 @@ export function PrescriptionPage() {
     setShowViewModal(true);
   };
 
+  const fetchConsultationData = async (consultationId?: string) => {
+    if (!consultationId) return { vitals: undefined, symptoms: undefined, clinicalNotes: undefined };
+    const { data } = await supabase
+      .from('consultations')
+      .select('vitals, symptoms, notes')
+      .eq('id', consultationId)
+      .single();
+    return {
+      vitals: data?.vitals as Vitals | undefined,
+      symptoms: (data?.symptoms as string) || undefined,
+      clinicalNotes: (data?.notes as string) || undefined,
+    };
+  };
+
   const handleDownloadPDF = async (rx: PrescriptionRow) => {
     try {
-      // Fetch vitals from consultation
-      let vitals: Vitals | undefined;
-      if (rx.consultationId) {
-        const { data } = await supabase
-          .from('consultations')
-          .select('vitals')
-          .eq('id', rx.consultationId)
-          .single();
-        if (data?.vitals) {
-          vitals = data.vitals;
-        }
-      }
-
-      const pdf = generatePrescriptionPDF(rx, vitals);
+      const { vitals, symptoms, clinicalNotes } = await fetchConsultationData(rx.consultationId);
+      const pdf = generatePrescriptionPDF({ ...rx, symptoms, clinicalNotes }, vitals);
       pdf.save(`Rx_${rx.prescriptionNo}_${rx.patient.name}.pdf`);
       toast.success('PDF downloaded');
     } catch {
@@ -142,23 +145,33 @@ export function PrescriptionPage() {
 
   const handlePrint = async (rx: PrescriptionRow) => {
     try {
-      let vitals: Vitals | undefined;
-      if (rx.consultationId) {
-        const { data } = await supabase
-          .from('consultations')
-          .select('vitals')
-          .eq('id', rx.consultationId)
-          .single();
-        if (data?.vitals) {
-          vitals = data.vitals;
-        }
-      }
-
-      const pdf = generatePrescriptionPDF(rx, vitals);
+      const { vitals, symptoms, clinicalNotes } = await fetchConsultationData(rx.consultationId);
+      const pdf = generatePrescriptionPDF({ ...rx, symptoms, clinicalNotes }, vitals);
       pdf.autoPrint();
       window.open(pdf.output('bloburl'), '_blank');
     } catch {
       toast.error('Failed to print prescription');
+    }
+  };
+
+  const handlePrintReceipt = async (rx: PrescriptionRow) => {
+    try {
+      const clinic = await fetchReceiptClinic();
+      const pdf = generateReceiptPDF({
+        receiptNo: `RCT-${rx.prescriptionNo}`,
+        date: rx.createdAt,
+        patientName: rx.patient.name,
+        patientPhone: rx.patient.phone,
+        serviceType: 'Consultation',
+        serviceDetails: rx.diagnosis ?? 'General Consultation',
+        amount: rx.doctor.consultationFee ?? 0,
+        paymentMethod: 'Cash',
+        receivedBy: rx.doctor.name,
+      }, clinic);
+      pdf.autoPrint();
+      window.open(pdf.output('bloburl'), '_blank');
+    } catch {
+      toast.error('Failed to generate receipt');
     }
   };
 
@@ -218,35 +231,29 @@ export function PrescriptionPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleView(rx);
-                }}
-                title="View"
+                onClick={(e) => { e.stopPropagation(); handleView(rx); }}
+                className="flex items-center gap-1.5"
               >
                 <Eye className="h-4 w-4" />
+                <span className="text-xs">View</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownloadPDF(rx);
-                }}
-                title="Download PDF"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePrint(rx);
-                }}
-                title="Print"
+                onClick={(e) => { e.stopPropagation(); handlePrintReceipt(rx); }}
+                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700"
               >
                 <Printer className="h-4 w-4" />
+                <span className="text-xs">Receipt</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); handleDownloadPDF(rx); }}
+                className="flex items-center gap-1.5 text-green-600 hover:text-green-700"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="text-xs">Prescription</span>
               </Button>
             </div>
           );

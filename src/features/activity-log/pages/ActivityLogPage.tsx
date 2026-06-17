@@ -1,9 +1,10 @@
-// #must: Activity log viewer — filterable table of all system actions with metadata detail modal
+
 import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/data/DataTable';
-import { Modal, Card, Input, Button, Spinner } from '@/components/ui';
+import { Modal, Card, Button, Spinner } from '@/components/ui';
+import { DatePickerField } from '@/components/forms/DatePickerField';
 import { buildActivityLogColumns } from '../components/ActivityLogTable';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseQuery } from '@/hooks';
@@ -45,8 +46,8 @@ const ACTION_TYPE_OPTIONS = [
 ];
 
 export function ActivityLogPage() {
-  const [filterFrom, setFilterFrom] = useState('');
-  const [filterTo, setFilterTo] = useState('');
+  const [filterFrom, setFilterFrom] = useState<Date | null>(null);
+  const [filterTo, setFilterTo] = useState<Date | null>(null);
   const [filterUser, setFilterUser] = useState('');
   const [filterAction, setFilterAction] = useState('');
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
@@ -84,6 +85,7 @@ export function ActivityLogPage() {
         to.setHours(23, 59, 59, 999);
         if (logDate > to) return false;
       }
+
       if (filterUser && log.userName !== filterUser) return false;
       if (filterAction && log.action.toLowerCase() !== filterAction.toLowerCase()) return false;
       return true;
@@ -133,23 +135,21 @@ export function ActivityLogPage() {
       <Card className="mb-6 p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              From Date
-            </label>
-            <Input
-              type="date"
-              value={filterFrom}
-              onChange={(e) => setFilterFrom(e.target.value)}
+            <DatePickerField
+              label="From Date"
+              selected={filterFrom}
+              onChange={setFilterFrom}
+              maxDate={filterTo ?? undefined}
+              placeholder="Select from date"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              To Date
-            </label>
-            <Input
-              type="date"
-              value={filterTo}
-              onChange={(e) => setFilterTo(e.target.value)}
+            <DatePickerField
+              label="To Date"
+              selected={filterTo}
+              onChange={setFilterTo}
+              minDate={filterFrom ?? undefined}
+              placeholder="Select to date"
             />
           </div>
           <div>
@@ -192,8 +192,8 @@ export function ActivityLogPage() {
               variant="ghost"
               size="sm"
               onClick={() => {
-                setFilterFrom('');
-                setFilterTo('');
+                setFilterFrom(null);
+                setFilterTo(null);
                 setFilterUser('');
                 setFilterAction('');
               }}

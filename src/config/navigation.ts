@@ -1,5 +1,3 @@
-// #must: Sidebar navigation configuration — defines menu structure and role-based access
-
 import { USER_ROLES } from './constants';
 import { ROUTES } from './routes';
 
@@ -44,6 +42,18 @@ export const NAVIGATION: NavGroup[] = [
     group: 'Pharmacy',
     items: [
       {
+        title: 'Add Medicine',
+        icon: 'PlusCircle',
+        path: ROUTES.PHARMACY_ADD_MEDICINE,
+        allowedRoles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.PHARMACIST],
+      },
+      {
+        title: 'Add Stock',
+        icon: 'PackagePlus',
+        path: ROUTES.PHARMACY_ADD_STOCK,
+        allowedRoles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.PHARMACIST],
+      },
+      {
         title: 'Inventory',
         icon: 'Package',
         path: ROUTES.PHARMACY_INVENTORY,
@@ -53,12 +63,6 @@ export const NAVIGATION: NavGroup[] = [
         title: 'Billing',
         icon: 'ShoppingCart',
         path: ROUTES.PHARMACY_BILLING,
-        allowedRoles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.PHARMACIST],
-      },
-      {
-        title: 'Add Medicine',
-        icon: 'PlusCircle',
-        path: ROUTES.PHARMACY_ADD_MEDICINE,
         allowedRoles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.PHARMACIST],
       },
       {
@@ -83,6 +87,12 @@ export const NAVIGATION: NavGroup[] = [
         icon: 'FileText',
         path: ROUTES.PRESCRIPTIONS,
         allowedRoles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.DOCTOR],
+      },
+      {
+        title: 'Doctors',
+        icon: 'Stethoscope',
+        path: ROUTES.SETTINGS_DOCTORS,
+        allowedRoles: [USER_ROLES.SUPER_ADMIN],
       },
     ],
   },
@@ -151,12 +161,6 @@ export const NAVIGATION: NavGroup[] = [
         title: 'User Management',
         icon: 'UserCog',
         path: ROUTES.SETTINGS_USERS,
-        allowedRoles: [USER_ROLES.SUPER_ADMIN],
-      },
-      {
-        title: 'Doctors',
-        icon: 'Stethoscope',
-        path: ROUTES.SETTINGS_DOCTORS,
         allowedRoles: [USER_ROLES.SUPER_ADMIN],
       },
       {

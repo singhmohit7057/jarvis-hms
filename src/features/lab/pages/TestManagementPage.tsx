@@ -1,4 +1,4 @@
-// #must: Lab test catalog management page — CRUD for lab tests with parameters
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';

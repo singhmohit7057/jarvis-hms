@@ -1,8 +1,11 @@
-// #must: Custom hook for lab booking CRUD operations with Supabase
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { LAB_STATUS } from '@/config/constants';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const safeUUID = (id?: string | null) => (id && UUID_RE.test(id) ? id : null);
 import type { LabBooking, LabStatus } from '@/types';
 import type { LabBookingFormData } from '../schemas/lab-booking.schema';
 
@@ -78,12 +81,18 @@ export function useLabBookings() {
         paymentMethod: row.payment_method ?? undefined,
         status: row.status,
         collectedBy: row.collected_by ?? undefined,
+        collectorName: row.collector_name ?? undefined,
+        bottleNumber: row.bottle_number ?? undefined,
         processedBy: row.processed_by ?? undefined,
         verifiedBy: row.verified_by ?? undefined,
+        preparedBy: row.prepared_by ?? undefined,
         createdAt: row.created_at,
       }));
 
       setBookings(mapped);
+    } catch (err) {
+      console.error('Failed to fetch bookings:', err);
+      setBookings([]);
     } finally {
       setIsLoading(false);
     }
@@ -142,14 +151,14 @@ export function useLabBookings() {
 
       if (btError) throw btError;
 
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        user_id: user?.id,
+      // Log activity (non-blocking)
+      supabase.from('activity_logs').insert({
+        user_id: safeUUID(user?.id),
         user_name: user?.name ?? 'Unknown',
         action: 'lab_booking_created',
         description: `Lab booking ${bookingNumber} created`,
         metadata: { bookingId: booking.id, patientId: data.patientId },
-      });
+      }).then(({ error }) => { if (error) console.warn('Activity log failed:', error.message); });
 
       return booking;
     },
@@ -157,7 +166,11 @@ export function useLabBookings() {
   );
 
   const updateStatus = useCallback(
-    async (id: string, newStatus: LabStatus) => {
+    async (
+      id: string,
+      newStatus: LabStatus,
+      extra?: { collectorName?: string; bottleNumber?: string }
+    ) => {
       // Fetch current status
       const { data: current, error: fetchError } = await supabase
         .from('lab_bookings')
@@ -176,11 +189,13 @@ export function useLabBookings() {
       const updateFields: Record<string, unknown> = { status: newStatus };
 
       if (newStatus === 'sample_collected') {
-        updateFields.collected_by = user?.id;
+        updateFields.collected_by = safeUUID(user?.id);
+        if (extra?.collectorName) updateFields.collector_name = extra.collectorName;
+        if (extra?.bottleNumber) updateFields.bottle_number = extra.bottleNumber;
       } else if (newStatus === 'processing') {
-        updateFields.processed_by = user?.id;
+        updateFields.processed_by = safeUUID(user?.id);
       } else if (newStatus === 'completed') {
-        updateFields.verified_by = user?.id;
+        updateFields.verified_by = safeUUID(user?.id);
       }
 
       const { error: updateError } = await supabase
@@ -190,14 +205,14 @@ export function useLabBookings() {
 
       if (updateError) throw updateError;
 
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        user_id: user?.id,
+      // Log activity (non-blocking)
+      supabase.from('activity_logs').insert({
+        user_id: safeUUID(user?.id),
         user_name: user?.name ?? 'Unknown',
         action: 'lab_status_updated',
         description: `Booking ${current.booking_number} status updated to ${newStatus}`,
         metadata: { bookingId: id, from: current.status, to: newStatus },
-      });
+      }).then(({ error }) => { if (error) console.warn('Activity log failed:', error.message); });
     },
     [user]
   );
@@ -232,8 +247,11 @@ export function useLabBookings() {
       paymentMethod: data.payment_method ?? undefined,
       status: data.status,
       collectedBy: data.collected_by ?? undefined,
+      collectorName: data.collector_name ?? undefined,
+      bottleNumber: data.bottle_number ?? undefined,
       processedBy: data.processed_by ?? undefined,
       verifiedBy: data.verified_by ?? undefined,
+      preparedBy: data.prepared_by ?? undefined,
       createdAt: data.created_at,
     };
 

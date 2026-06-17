@@ -1,4 +1,4 @@
-// #must: Zustand store for sidebar collapse and mobile open state
+
 import { create } from 'zustand';
 
 interface SidebarStore {

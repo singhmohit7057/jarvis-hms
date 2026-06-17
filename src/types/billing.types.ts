@@ -1,5 +1,3 @@
-// #must: Billing and invoice type definitions
-
 import type { Sale } from './pharmacy.types';
 import type { PAYMENT_METHODS } from '@/config/constants';
 

@@ -1,5 +1,3 @@
-// #must: Main dashboard page — renders role-specific dashboard with greeting header
-
 import { useAuthStore } from '@/store/authStore';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Spinner } from '@/components/ui/Spinner';

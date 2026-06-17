@@ -1,5 +1,3 @@
-// #must: GST calculation utilities — CGST/SGST split for intra-state billing
-
 import type { CartItem, GSTBreakdown } from '@/types/pharmacy.types';
 import type { GSTPercentage } from '@/types/pharmacy.types';
 
@@ -15,19 +13,20 @@ export interface GSTResult {
  * Calculate GST for a given amount at a specific slab.
  * Splits into equal CGST and SGST (intra-state).
  */
-export function calculateGST(amount: number, gstPercentage: number): GSTResult {
-  const taxableAmount = amount;
-  const totalGst = (taxableAmount * gstPercentage) / 100;
+// MRP in Indian pharmacy is GST-inclusive — extract GST from MRP rather than adding on top.
+export function calculateGST(mrpAmount: number, gstPercentage: number): GSTResult {
+  const divisor = 1 + gstPercentage / 100;
+  const taxableAmount = mrpAmount / divisor;
+  const totalGst = mrpAmount - taxableAmount;
   const cgst = totalGst / 2;
   const sgst = totalGst / 2;
-  const totalWithGst = taxableAmount + totalGst;
 
   return {
     taxableAmount: Math.round(taxableAmount * 100) / 100,
     cgst: Math.round(cgst * 100) / 100,
     sgst: Math.round(sgst * 100) / 100,
     totalGst: Math.round(totalGst * 100) / 100,
-    totalWithGst: Math.round(totalWithGst * 100) / 100,
+    totalWithGst: Math.round(mrpAmount * 100) / 100,
   };
 }
 
@@ -41,22 +40,25 @@ export interface CartGSTResult {
 /**
  * Calculate aggregate GST for a cart of items, grouped by slab.
  */
+// MRP is GST-inclusive — extract GST per slab from MRP total.
 export function calculateCartGST(items: CartItem[]): CartGSTResult {
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
   const slabMap = new Map<GSTPercentage, number>();
 
   for (const item of items) {
-    const taxable = item.unitPrice * item.quantity;
+    const mrpTotal = item.unitPrice * item.quantity;
     const current = slabMap.get(item.gstPercentage) ?? 0;
-    slabMap.set(item.gstPercentage, current + taxable);
+    slabMap.set(item.gstPercentage, current + mrpTotal);
   }
 
   const gstBreakdown: GSTBreakdown[] = [];
   let gstTotal = 0;
 
-  for (const [percentage, taxableAmount] of slabMap.entries()) {
-    const totalGst = (taxableAmount * percentage) / 100;
+  for (const [percentage, mrpTotal] of slabMap.entries()) {
+    const divisor = 1 + percentage / 100;
+    const taxableAmount = mrpTotal / divisor;
+    const totalGst = mrpTotal - taxableAmount;
     const cgst = totalGst / 2;
     const sgst = totalGst / 2;
 
@@ -75,7 +77,7 @@ export function calculateCartGST(items: CartItem[]): CartGSTResult {
     subtotal: Math.round(subtotal * 100) / 100,
     gstBreakdown,
     gstTotal: Math.round(gstTotal * 100) / 100,
-    grandTotal: Math.round((subtotal + gstTotal) * 100) / 100,
+    grandTotal: Math.round(subtotal * 100) / 100,
   };
 }
 

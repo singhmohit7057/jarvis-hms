@@ -1,4 +1,4 @@
-// #must: Read-only role permissions reference card — shows which modules each role can access
+
 import { Card } from '@/components/ui';
 import { ShieldCheck } from 'lucide-react';
 

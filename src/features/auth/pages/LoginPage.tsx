@@ -1,6 +1,6 @@
-// #must: Login page — email/password form with validation, error display, and redirect on success
+
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -13,6 +13,7 @@ import { loginSchema, type LoginFormData } from '../schemas/auth.schema';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useAuthStore((s) => s.login);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,8 @@ export function LoginPage() {
     try {
       setError(null);
       await login(data.email, data.password);
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      const from = (location.state as { from?: Location })?.from?.pathname ?? ROUTES.DASHBOARD;
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     }
@@ -41,8 +43,8 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo and app name */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-600 text-white text-2xl font-bold mb-4">
-            J
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-4 overflow-hidden">
+            <img src="/logo.svg" alt="logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {APP_NAME}

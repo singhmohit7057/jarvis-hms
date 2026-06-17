@@ -1,6 +1,4 @@
-// #must: Doctor collection report — appointment revenue, completion rates, per-doctor breakdown
-
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   DollarSign,
@@ -79,7 +77,7 @@ export function DoctorCollectionPage() {
   );
 
   const { data: rawAppointments, isLoading } = useSupabaseQuery<RawAppointment>(
-    useCallback(async () => {
+    async () => {
       const start = toDateStr(filters.startDate);
       const end = toDateStr(filters.endDate);
 
@@ -96,7 +94,8 @@ export function DoctorCollectionPage() {
 
       const { data, error } = await query;
       return { data: (data ?? []) as RawAppointment[], error };
-    }, [filters, selectedDoctorId])
+    },
+    [filters, selectedDoctorId]
   );
 
   const doctorOptions = [
@@ -161,7 +160,7 @@ export function DoctorCollectionPage() {
         map[date] = { date, appointments: 0, completed: 0, collection: 0 };
       }
       map[date].appointments += 1;
-      if (appt.status === 'completed') {
+      if (appt.status === 'completed' && appt.payment_status === 'paid') {
         map[date].completed += 1;
         map[date].collection += appt.fee ?? 0;
       }
@@ -282,7 +281,7 @@ export function DoctorCollectionPage() {
         title="Doctor Collection Report"
         subtitle="Appointment revenue and collection by doctor"
         breadcrumbs={[
-          { label: 'Reports', path: ROUTES.REPORTS_DOCTOR },
+          { label: 'Reports', path: ROUTES.REPORTS },
           { label: 'Doctor Collection' },
         ]}
       />

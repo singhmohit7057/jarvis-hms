@@ -1,4 +1,4 @@
-// #must: Vertical timeline view of today's appointments with color-coded status
+
 import { cn } from '@/lib/utils';
 import { Clock, User } from 'lucide-react';
 import { StatusBadge } from '@/components/data/StatusBadge';
@@ -32,7 +32,7 @@ function getStatusColor(status: string): string {
 }
 
 export function AppointmentCalendar({ appointments, onSlotClick }: AppointmentCalendarProps) {
-  const sorted = [...appointments].sort((a, b) => a.time.localeCompare(b.time));
+  const sorted = [...appointments].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
 
   if (sorted.length === 0) {
     return (

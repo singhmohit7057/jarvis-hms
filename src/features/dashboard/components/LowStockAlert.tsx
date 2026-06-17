@@ -1,5 +1,3 @@
-// #must: Low stock alert card — fetches medicine batches with quantity < 10, shows name/stock/expiry
-
 import { AlertTriangle, PackageOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
@@ -16,6 +14,7 @@ interface LowStockRow {
   batch_number: string;
   quantity_in_stock: number;
   expiry_date: string;
+  reorder_level: number;
 }
 
 export interface LowStockAlertProps {
@@ -23,17 +22,31 @@ export interface LowStockAlertProps {
 }
 
 export function LowStockAlert({ limit = 5 }: LowStockAlertProps) {
-  const { data, isLoading } = useSupabaseQuery<LowStockRow>(
+  const { data: raw, isLoading } = useSupabaseQuery<Record<string, unknown>>(
     async () =>
       supabase
         .from('medicine_batches')
-        .select('id, medicine_name, batch_number, quantity_in_stock, expiry_date')
-        .lt('quantity_in_stock', 10)
-        .gt('quantity_in_stock', -1)
-        .order('quantity_in_stock', { ascending: true })
-        .limit(limit),
-    [limit]
+        .select('id, batch_number, quantity_in_stock, expiry_date, medicines(name, reorder_level)')
+        .gte('quantity_in_stock', 0)
+        .order('quantity_in_stock', { ascending: true }),
+    []
   );
+
+  const data: LowStockRow[] = raw
+    .filter((r) => {
+      const qty = r.quantity_in_stock as number;
+      const reorder = (r.medicines as { reorder_level: number } | null)?.reorder_level ?? 0;
+      return qty <= reorder;
+    })
+    .slice(0, limit)
+    .map((r) => ({
+      id: r.id as string,
+      medicine_name: (r.medicines as { name: string } | null)?.name ?? '—',
+      batch_number: r.batch_number as string,
+      quantity_in_stock: r.quantity_in_stock as number,
+      expiry_date: r.expiry_date as string,
+      reorder_level: (r.medicines as { reorder_level: number } | null)?.reorder_level ?? 0,
+    }));
 
   return (
     <Card
@@ -72,20 +85,22 @@ export function LowStockAlert({ limit = 5 }: LowStockAlertProps) {
                 </p>
               </div>
               <div className="flex items-center gap-2 ml-3 shrink-0">
-                {item.quantity_in_stock < 5 && (
+                {item.quantity_in_stock === 0 && (
                   <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                 )}
-                <span
-                  className={cn(
-                    'text-sm font-bold tabular-nums',
-                    item.quantity_in_stock < 5
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-amber-600 dark:text-amber-400'
-                  )}
-                >
-                  {item.quantity_in_stock}
-                </span>
-                <span className="text-xs text-gray-400">left</span>
+                <div className="text-right">
+                  <span
+                    className={cn(
+                      'text-sm font-bold tabular-nums',
+                      item.quantity_in_stock === 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    )}
+                  >
+                    {item.quantity_in_stock}
+                  </span>
+                  <span className="text-xs text-gray-400"> / {item.reorder_level}</span>
+                </div>
               </div>
             </li>
           ))}

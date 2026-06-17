@@ -1,4 +1,4 @@
-// #must: Doctor consultation view — patient info, history, vitals, diagnosis, prescription
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
@@ -23,8 +23,11 @@ import {
   ChevronDown,
   ChevronRight,
   Stethoscope,
+  Activity,
+  Eye,
 } from 'lucide-react';
-import type { Appointment, Patient, Doctor, Consultation, Vitals } from '@/types';
+import { generatePrescriptionPDF } from '@/lib/pdf/prescription.pdf';
+import type { Appointment, Patient, Doctor, Consultation, Vitals, PrescriptionItem } from '@/types';
 
 interface PastAppointment {
   id: string;
@@ -38,6 +41,16 @@ interface PastPrescription {
   prescriptionNo: string;
   diagnosis: string;
   date: string;
+  consultationId?: string;
+  advice?: string;
+  followupNote?: string;
+  items: PrescriptionItem[];
+}
+
+interface PastVitals {
+  date: string;
+  diagnosis: string;
+  vitals: Vitals;
 }
 
 export function ConsultationPage() {
@@ -51,9 +64,11 @@ export function ConsultationPage() {
   const [existingVitals, setExistingVitals] = useState<Vitals | null>(null);
   const [pastAppointments, setPastAppointments] = useState<PastAppointment[]>([]);
   const [pastPrescriptions, setPastPrescriptions] = useState<PastPrescription[]>([]);
+  const [pastVitalsList, setPastVitalsList] = useState<PastVitals[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showPrescriptions, setShowPrescriptions] = useState(false);
+  const [showVitals, setShowVitals] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -132,10 +147,10 @@ export function ConsultationPage() {
           );
         }
 
-        // Fetch past prescriptions
+        // Fetch past prescriptions with items
         const { data: pastRx } = await supabase
           .from('prescriptions')
-          .select('id, prescription_no, diagnosis, created_at')
+          .select('id, prescription_no, diagnosis, advice, followup_note, created_at, consultation_id, items:prescription_items(*)')
           .eq('patient_id', p.id)
           .order('created_at', { ascending: false })
           .limit(10);
@@ -146,8 +161,49 @@ export function ConsultationPage() {
               id: rx.id,
               prescriptionNo: rx.prescription_no,
               diagnosis: rx.diagnosis,
+              advice: rx.advice ?? undefined,
+              followupNote: rx.followup_note ?? undefined,
               date: rx.created_at,
+              consultationId: rx.consultation_id ?? undefined,
+              items: ((rx.items ?? []) as Record<string, unknown>[]).map((item) => ({
+                id: item.id as string,
+                prescriptionId: item.prescription_id as string,
+                medicineName: item.medicine_name as string,
+                dosage: item.dosage as string,
+                frequency: item.frequency as string,
+                duration: item.duration as string,
+                timing: (item.timing as string) ?? '',
+                instructions: (item.instructions as string) ?? undefined,
+              })),
             }))
+          );
+        }
+
+        // Fetch past vitals from consultations (exclude current appointment)
+        const { data: pastConsults } = await supabase
+          .from('consultations')
+          .select('created_at, diagnosis, vitals, appointment_id')
+          .eq('patient_id', p.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (pastConsults) {
+          // deduplicate by appointment_id — keep only the latest per visit
+          const seen = new Set<string>();
+          setPastVitalsList(
+            pastConsults
+              .filter((c) => c.appointment_id !== id)
+              .filter((c) => {
+                if (seen.has(c.appointment_id)) return false;
+                seen.add(c.appointment_id);
+                return true;
+              })
+              .filter((c) => c.vitals && Object.values(c.vitals as Record<string, string>).some(Boolean))
+              .map((c) => ({
+                date: c.created_at,
+                diagnosis: c.diagnosis || '-',
+                vitals: c.vitals as Vitals,
+              }))
           );
         }
       }
@@ -229,7 +285,7 @@ export function ConsultationPage() {
     );
   }
 
-  const isCompleted = appointment.status === 'completed';
+  const isCompleted = appointment.status === 'completed' || (appointment.status === 'in_progress' && !!existingConsultation);
 
   return (
     <div>
@@ -326,7 +382,7 @@ export function ConsultationPage() {
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  Past Visits ({pastAppointments.length})
+                  Visit History ({pastAppointments.length})
                 </h3>
               </div>
               {showHistory ? (
@@ -365,6 +421,54 @@ export function ConsultationPage() {
             )}
           </Card>
 
+          {/* Past Vitals */}
+          <Card>
+            <button
+              type="button"
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors rounded-t-lg"
+              onClick={() => setShowVitals(!showVitals)}
+            >
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  Past Vitals ({pastVitalsList.length})
+                </h3>
+              </div>
+              {showVitals ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+            </button>
+            {showVitals && (
+              <div className="px-4 pb-4 space-y-2 max-h-72 overflow-y-auto">
+                {pastVitalsList.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 py-2">No past vitals found</p>
+                ) : (
+                  pastVitalsList.map((pv, i) => (
+                    <div key={i} className="rounded-md border border-gray-100 dark:border-slate-700 text-sm overflow-hidden">
+                      <div className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50 dark:bg-slate-700/40">
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{formatDate(pv.date)}</span>
+                        <span className="text-xs text-gray-500 truncate max-w-[120px]">{pv.diagnosis}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-px bg-gray-100 dark:bg-slate-700">
+                        {[
+                          ['BP', pv.vitals.bp],
+                          ['Pulse', pv.vitals.pulse],
+                          ['Temp', pv.vitals.temp ? `${pv.vitals.temp}°F` : ''],
+                          ['Weight', pv.vitals.weight ? `${pv.vitals.weight}kg` : ''],
+                          ['Height', pv.vitals.height ? `${pv.vitals.height}cm` : ''],
+                          ['SpO2', pv.vitals.spo2 ? `${pv.vitals.spo2}%` : ''],
+                        ].filter(([, v]) => v).map(([label, value]) => (
+                          <div key={label} className="bg-white dark:bg-slate-800 px-2 py-1.5 text-center">
+                            <p className="text-[10px] text-gray-400 uppercase">{label}</p>
+                            <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </Card>
+
           {/* Past Prescriptions */}
           <Card>
             <button
@@ -392,21 +496,71 @@ export function ConsultationPage() {
                   </p>
                 ) : (
                   pastPrescriptions.map((rx) => (
-                    <div
-                      key={rx.id}
-                      className="p-2 rounded-md bg-gray-50 dark:bg-slate-700/30 text-sm"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs text-gray-500">
-                          {rx.prescriptionNo}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {formatDate(rx.date)}
-                        </span>
+                    <div key={rx.id} className="rounded-md border border-gray-100 dark:border-slate-700 text-sm overflow-hidden">
+                      <div className="flex items-center justify-between px-2.5 py-2 bg-gray-50 dark:bg-slate-700/40">
+                        <div>
+                          <span className="font-mono text-xs text-gray-500">{rx.prescriptionNo}</span>
+                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[150px]">{rx.diagnosis}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-gray-400">{formatDate(rx.date)}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-1.5 text-blue-600 hover:text-blue-700"
+                            onClick={async () => {
+                              if (!patient || !doctor) return;
+                              let vitals: Vitals | undefined;
+                              let symptoms: string | undefined;
+                              let clinicalNotes: string | undefined;
+                              if (rx.consultationId) {
+                                const { data } = await supabase
+                                  .from('consultations')
+                                  .select('vitals, symptoms, notes')
+                                  .eq('id', rx.consultationId)
+                                  .single();
+                                if (data?.vitals) vitals = data.vitals as Vitals;
+                                if (data?.symptoms) symptoms = data.symptoms as string;
+                                if (data?.notes) clinicalNotes = data.notes as string;
+                              }
+                              const pdf = generatePrescriptionPDF({
+                                id: rx.id,
+                                prescriptionNo: rx.prescriptionNo,
+                                patientId: patient.id,
+                                doctorId: doctor.id,
+                                appointmentId: '',
+                                consultationId: rx.consultationId ?? '',
+                                diagnosis: rx.diagnosis,
+                                advice: rx.advice ?? '',
+                                followupDate: rx.followupNote,
+                                items: rx.items,
+                                patient,
+                                doctor,
+                                createdAt: rx.date,
+                                symptoms,
+                                clinicalNotes,
+                              }, vitals);
+                              window.open(pdf.output('bloburl'), '_blank');
+                            }}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-gray-700 dark:text-gray-300 mt-0.5 truncate">
-                        {rx.diagnosis}
-                      </p>
+                      {rx.items.length > 0 && (
+                        <div className="px-2.5 py-1.5 space-y-0.5">
+                          {rx.items.map((item) => (
+                            <div key={item.id} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                              <span className="font-medium text-gray-800 dark:text-gray-200">{item.medicineName}</span>
+                              <span className="text-gray-400">·</span>
+                              <span>{item.frequency}</span>
+                              <span className="text-gray-400">·</span>
+                              <span>{item.duration}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -486,6 +640,7 @@ export function ConsultationPage() {
           )}
         </div>
       </div>
+
     </div>
   );
 }

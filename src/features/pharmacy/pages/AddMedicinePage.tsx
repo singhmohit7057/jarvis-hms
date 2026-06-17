@@ -1,4 +1,4 @@
-// #must: Form page for adding/editing a medicine with react-hook-form + zod validation
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -8,43 +8,33 @@ import { Button } from '@/components/ui/Button';
 import { ROUTES } from '@/config/routes';
 import { useInventory } from '../hooks/useInventory';
 import { MedicineForm } from '../components/MedicineForm';
-import type { MedicineWithBatchFormData, MedicineFormData } from '../schemas/medicine.schema';
+import type { MedicineFormData } from '../schemas/medicine.schema';
 
 export function AddMedicinePage() {
   const navigate = useNavigate();
-  const { addMedicine, addBatch } = useInventory();
+  const { addMedicine } = useInventory();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (data: MedicineWithBatchFormData | MedicineFormData) => {
+  const handleSubmit = async (data: MedicineFormData) => {
     setIsSubmitting(true);
     try {
-      const medicineId = await addMedicine({
+      await addMedicine({
         name: data.name,
         genericName: data.genericName,
         company: data.company,
         category: data.category,
         composition: data.composition,
+        packSize: data.packSize,
+        looseSell: data.looseSell,
         hsnCode: data.hsnCode,
         gstPercentage: data.gstPercentage,
-        unit: data.unit,
+        reorderLevel: data.reorderLevel,
+        rackLocation: data.rackLocation,
       });
-
-      // Add initial batch if provided
-      if ('batch' in data && data.batch) {
-        await addBatch(medicineId, {
-          batchNumber: data.batch.batchNumber,
-          expiryDate: data.batch.expiryDate,
-          mrp: data.batch.mrp,
-          purchasePrice: data.batch.purchasePrice,
-          sellingPrice: data.batch.sellingPrice,
-          quantityInStock: data.batch.quantityInStock,
-        });
-      }
-
       toast.success('Medicine added successfully');
       navigate(ROUTES.PHARMACY_INVENTORY);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to add medicine';
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Failed to add medicine';
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -55,7 +45,7 @@ export function AddMedicinePage() {
     <div>
       <PageHeader
         title="Add Medicine"
-        subtitle="Add a new medicine to inventory with initial batch"
+        subtitle="Register a new medicine (name, category, GST, pack size etc.)"
         breadcrumbs={[
           { label: 'Pharmacy', path: ROUTES.PHARMACY_INVENTORY },
           { label: 'Inventory', path: ROUTES.PHARMACY_INVENTORY },
@@ -72,7 +62,12 @@ export function AddMedicinePage() {
         }
       />
 
-      <MedicineForm onSubmit={handleSubmit} isLoading={isSubmitting} />
+      <MedicineForm
+        onSubmit={handleSubmit as Parameters<typeof MedicineForm>[0]['onSubmit']}
+        isLoading={isSubmitting}
+        isEditMode={false}
+        submitLabel="Add Medicine"
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// #must: Convenience hook wrapping authStore — provides auth state and actions
+
 import { useAuthStore } from '@/store/authStore';
 
 export function useAuth() {

@@ -1,4 +1,4 @@
-// #must: Single parameter row in lab report entry with auto-flag calculation
+
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import type { LabResultEntry } from '@/types';
@@ -38,9 +38,9 @@ function parseRange(rangeStr: string): { min: number; max: number } | null {
   return { min, max };
 }
 
-function calculateFlag(value: string, normalRange: string): LabResultEntry['flag'] {
+function calculateFlag(value: string, normalRange: string, currentFlag: LabResultEntry['flag'] = 'normal'): LabResultEntry['flag'] {
   const numValue = parseFloat(value);
-  if (isNaN(numValue)) return 'normal';
+  if (isNaN(numValue)) return value.trim() === '' ? 'normal' : currentFlag;
 
   const range = parseRange(normalRange);
   if (!range) return 'normal';
@@ -59,7 +59,7 @@ export function ReportParameterRow({
 }: ReportParameterRowProps) {
   const handleValueChange = (newValue: string) => {
     onChange(newValue);
-    const autoFlag = calculateFlag(newValue, parameter.normalRange);
+    const autoFlag = calculateFlag(newValue, parameter.normalRange, flag);
     onFlagChange(autoFlag);
   };
 

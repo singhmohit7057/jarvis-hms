@@ -1,4 +1,4 @@
-// #must: Role-based route guard — restricts access to specified roles, redirects others to dashboard
+
 import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -21,7 +21,7 @@ export function RoleRoute({ allowedRoles }: RoleRouteProps) {
         description: 'You do not have permission to access this page.',
       });
     }
-  }, []);
+  }, [isRoleDenied]);
 
   if (!user) {
     return <Navigate to={ROUTES.LOGIN} replace />;

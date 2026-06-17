@@ -1,4 +1,4 @@
-// #must: DataTable for test catalog with expandable parameter details
+
 import { useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/data/DataTable';

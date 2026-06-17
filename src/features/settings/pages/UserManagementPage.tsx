@@ -1,4 +1,4 @@
-// #must: User management page — list profiles, add new user profile, edit role/status
+
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/data/DataTable';
@@ -6,7 +6,7 @@ import { Modal, Button, Spinner } from '@/components/ui';
 import { UserForm } from '../components/UserForm';
 import type { UserFormValues } from '../components/UserForm';
 import { buildUserColumns } from '../components/UserTable';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { useSupabaseQuery } from '@/hooks';
 import { useActivityLog } from '@/hooks';
 import type { User, UserRole } from '@/types';
@@ -54,40 +54,40 @@ export function UserManagementPage() {
   const users: User[] = profiles.map(mapProfileToUser);
 
   const handleAddUser = async (values: UserFormValues) => {
+    if (!supabaseAdmin) {
+      toast.error('Admin key not configured. Add VITE_SUPABASE_SERVICE_ROLE_KEY to .env');
+      return;
+    }
     setIsSaving(true);
     try {
-      // Check if a profile with this email already exists in auth users
-      // We insert into profiles — the auth user must already exist
-      const { data: existingAuth, error: lookupError } = await supabase
+      // Check for duplicate profile
+      const { data: existing } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', values.email)
         .maybeSingle<{ id: string }>();
 
-      if (lookupError) {
-        toast.error('Lookup failed: ' + lookupError.message);
+      if (existing) {
+        toast.error('A user with this email already exists');
         return;
       }
 
-      if (existingAuth) {
-        toast.error('A profile with this email already exists');
+      // Create auth account via admin client
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: values.email,
+        password: values.password,
+        email_confirm: true,
+        user_metadata: { full_name: values.name },
+      });
+
+      if (authError || !authData.user) {
+        toast.error('Failed to create auth account: ' + (authError?.message ?? 'Unknown error'));
         return;
       }
 
-      const { data: authUserData, error: authLookupError } =
-        await supabase.auth.admin.getUserByEmail(values.email);
-
-      if (authLookupError || !authUserData?.user?.id) {
-        toast.error(
-          'Could not find an auth account for this email. The user must sign up first.'
-        );
-        return;
-      }
-
-      const authUserId = authUserData.user.id;
-
-      const { error } = await supabase.from('profiles').insert({
-        id: authUserId,
+      // Create profile row linked to auth user
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
         email: values.email,
         name: values.name,
         phone: values.phone ?? '',
@@ -95,19 +95,21 @@ export function UserManagementPage() {
         is_active: true,
       });
 
-      if (error) {
-        toast.error('Failed to create profile: ' + error.message);
+      if (profileError) {
+        // Roll back auth user if profile insert fails
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        toast.error('Failed to create profile: ' + profileError.message);
         return;
       }
 
       await logActivity({
         action: 'create',
         entityType: 'user',
-        description: `Created user profile for ${values.name} (${values.email})`,
+        description: `Created user ${values.name} (${values.email}) with role ${values.role}`,
         metadata: { email: values.email, role: values.role },
       });
 
-      toast.success(`Profile for ${values.name} created successfully`);
+      toast.success(`User ${values.name} created successfully`);
       setIsAddModalOpen(false);
       refetch();
     } finally {
@@ -209,6 +211,37 @@ export function UserManagementPage() {
           emptyMessage="No users found"
         />
       )}
+
+      {/* Role permissions reference */}
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Role Permissions</h3>
+        <div className="rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-slate-800">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400 w-40">Role</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Access</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800/50">
+              {[
+                { role: 'Super Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', access: 'Full access — all pages, settings, reports' },
+                { role: 'Pharmacist',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', access: 'Pharmacy (inventory, billing, sales), pharmacy reports' },
+                { role: 'Doctor',      color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', access: 'Appointments, consultations, prescriptions, doctor reports' },
+                { role: 'Lab Staff',   color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', access: 'Lab bookings, test catalog, report entry, lab reports' },
+                { role: 'Receptionist',color: 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300', access: 'Patients, appointments, lab bookings' },
+              ].map(({ role, color, access }) => (
+                <tr key={role} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                  <td className="px-4 py-2.5">
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${color}`}>{role}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{access}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Add User Modal */}
       <Modal

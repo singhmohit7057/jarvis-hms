@@ -1,4 +1,4 @@
-// #must: Zod validation schemas for auth forms — login, forgot password, reset password
+
 import { z } from 'zod';
 
 export const loginSchema = z.object({

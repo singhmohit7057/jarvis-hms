@@ -1,4 +1,4 @@
-// #must: CSS-only tooltip on hover with configurable position
+
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 

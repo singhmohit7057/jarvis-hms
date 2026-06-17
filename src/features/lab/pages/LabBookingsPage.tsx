@@ -1,4 +1,4 @@
-// #must: Lab bookings management page — status tabs, booking table, new booking modal
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,6 +13,10 @@ import { useLabBookings } from '../hooks/useLabBookings';
 import { LabBookingForm } from '../components/LabBookingForm';
 import { LabBookingTable } from '../components/LabBookingTable';
 import { LabStatusTracker } from '../components/LabStatusTracker';
+import { CollectSampleModal } from '../components/CollectSampleModal';
+import { generateLabReceiptPDF, fetchLabReceiptClinic } from '@/lib/pdf/lab-receipt.pdf';
+import { generateLabReportPDF } from '@/lib/pdf/lab-report.pdf';
+import { supabase } from '@/lib/supabase';
 import type { LabBooking, LabStatus } from '@/types';
 import type { LabBookingFormData } from '../schemas/lab-booking.schema';
 
@@ -43,6 +47,8 @@ export function LabBookingsPage() {
     booking: LabBooking;
     nextStatus: LabStatus;
   } | null>(null);
+  const [collectSampleBooking, setCollectSampleBooking] = useState<LabBooking | null>(null);
+  const [isCollecting, setIsCollecting] = useState(false);
   const [detailBooking, setDetailBooking] = useState<LabBooking | null>(null);
 
   useEffect(() => {
@@ -71,9 +77,34 @@ export function LabBookingsPage() {
     (booking: LabBooking) => {
       const nextStatus = getNextStatus(booking.status);
       if (!nextStatus) return;
-      setStatusConfirm({ booking, nextStatus });
+      if (booking.status === 'booked') {
+        setCollectSampleBooking(booking);
+      } else {
+        setStatusConfirm({ booking, nextStatus });
+      }
     },
     [getNextStatus]
+  );
+
+  const confirmCollectSample = useCallback(
+    async (collectorName: string, bottleNumber: string) => {
+      if (!collectSampleBooking) return;
+      setIsCollecting(true);
+      try {
+        await updateStatus(collectSampleBooking.id, 'sample_collected', {
+          collectorName,
+          bottleNumber,
+        });
+        toast.success('Sample collected successfully');
+        fetchBookings(activeTab === 'all' ? undefined : { status: activeTab as LabStatus });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to collect sample');
+      } finally {
+        setIsCollecting(false);
+        setCollectSampleBooking(null);
+      }
+    },
+    [collectSampleBooking, updateStatus, fetchBookings, activeTab]
   );
 
   const confirmStatusUpdate = useCallback(async () => {
@@ -102,28 +133,69 @@ export function LabBookingsPage() {
     [navigate]
   );
 
-  const handlePrintReceipt = useCallback((booking: LabBooking) => {
-    // Simple receipt print
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    const testLines = booking.tests
-      .map((t) => `<tr><td>${t.testName}</td><td style="text-align:right">₹${t.price.toFixed(2)}</td></tr>`)
-      .join('');
-    printWindow.document.write(`
-      <html><head><title>Receipt - ${booking.bookingNumber}</title>
-      <style>body{font-family:sans-serif;padding:20px;max-width:400px;margin:0 auto}
-      table{width:100%;border-collapse:collapse}td{padding:4px 0;border-bottom:1px solid #eee}
-      .total{font-weight:bold;font-size:1.1em;border-top:2px solid #333}</style></head>
-      <body><h2>Lab Receipt</h2><p><strong>Booking:</strong> ${booking.bookingNumber}</p>
-      <p><strong>Patient:</strong> ${booking.patient?.name ?? 'N/A'}</p>
-      <p><strong>Date:</strong> ${new Date(booking.createdAt).toLocaleDateString()}</p>
-      <table>${testLines}<tr class="total"><td>Total</td><td style="text-align:right">₹${booking.totalAmount.toFixed(2)}</td></tr></table>
-      <p><strong>Payment:</strong> ${booking.paymentMethod ?? 'N/A'} (${booking.paymentStatus})</p>
-      <p style="margin-top:20px;font-size:0.8em;color:#666">Thank you for choosing our services.</p>
-      </body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+  const handlePrintReport = useCallback(async (booking: LabBooking) => {
+    try {
+      const { data: reports, error } = await supabase
+        .from('lab_reports')
+        .select('*')
+        .eq('lab_booking_id', booking.id);
+      if (error) throw error;
+      if (!reports || reports.length === 0) {
+        toast.error('No report data found. Enter results first.');
+        return;
+      }
+      const mappedReports = reports.map((r) => ({
+        id: r.id,
+        labBookingId: r.lab_booking_id,
+        labTestId: r.lab_test_id,
+        testName: r.test_name,
+        patientId: r.patient_id,
+        results: r.results ?? [],
+        interpretation: r.interpretation ?? undefined,
+        verifiedBy: r.verified_by,
+        createdAt: r.created_at,
+        test: {
+          id: r.lab_test_id, testName: r.test_name, testCode: '',
+          category: '', price: 0, sampleType: '', parameters: [],
+          isActive: true, createdAt: '',
+        },
+      }));
+      if (!booking.patient) {
+        toast.error('Patient data not available');
+        return;
+      }
+      const pdf = generateLabReportPDF(
+        { ...booking, patient: booking.patient },
+        mappedReports
+      );
+      pdf.save(`Lab-Report-${booking.bookingNumber}.pdf`);
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? 'Failed to generate report');
+    }
+  }, []);
+
+  const handlePrintReceipt = useCallback(async (booking: LabBooking) => {
+    try {
+      const clinic = await fetchLabReceiptClinic();
+      const pdf = generateLabReceiptPDF(
+        {
+          bookingNumber: booking.bookingNumber,
+          date: booking.createdAt,
+          patientName: booking.patient?.name ?? 'Unknown',
+          patientId: booking.patient?.patientId,
+          patientPhone: booking.patient?.phone,
+          tests: booking.tests.map((t) => ({ testName: t.testName, price: t.price })),
+          totalAmount: booking.totalAmount,
+          paymentMethod: booking.paymentMethod ?? 'cash',
+          collectorName: booking.collectorName,
+          bottleNumber: booking.bottleNumber,
+        },
+        clinic
+      );
+      pdf.save(`Lab_Receipt_${booking.bookingNumber}.pdf`);
+    } catch {
+      toast.error('Failed to generate receipt');
+    }
   }, []);
 
   return (
@@ -152,6 +224,7 @@ export function LabBookingsPage() {
           onUpdateStatus={handleUpdateStatus}
           onViewDetails={handleViewDetails}
           onEnterReport={handleEnterReport}
+          onPrintReport={handlePrintReport}
           onPrintReceipt={handlePrintReceipt}
           getNextStatus={getNextStatus}
         />
@@ -170,6 +243,15 @@ export function LabBookingsPage() {
           isSubmitting={isSubmitting}
         />
       </Modal>
+
+      {/* Collect Sample Modal */}
+      <CollectSampleModal
+        isOpen={!!collectSampleBooking}
+        bookingNumber={collectSampleBooking?.bookingNumber ?? ''}
+        onClose={() => setCollectSampleBooking(null)}
+        onConfirm={confirmCollectSample}
+        isLoading={isCollecting}
+      />
 
       {/* Status Update Confirmation */}
       <ConfirmDialog

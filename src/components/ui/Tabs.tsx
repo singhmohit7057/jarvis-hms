@@ -1,4 +1,4 @@
-// #must: Horizontal tab bar with active indicator
+
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 

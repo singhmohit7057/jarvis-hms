@@ -1,5 +1,3 @@
-// #must: Expiry report page — expired, expiring in 30 days, and expiring in 90 days tabs
-
 import { useState, useMemo, useCallback } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, XCircle, Calendar } from 'lucide-react';
@@ -64,11 +62,13 @@ export function ExpiryReportPage() {
   );
 
   const allRows = useMemo<ExpiryRow[]>(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
     return rawBatches.map((b) => {
       const expiry = new Date(b.expiry_date);
       expiry.setHours(0, 0, 0, 0);
       const msPerDay = 1000 * 60 * 60 * 24;
-      const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / msPerDay);
+      const daysUntilExpiry = Math.floor((expiry.getTime() - now.getTime()) / msPerDay);
 
       let status: ExpiryRow['status'] = 'OK';
       if (daysUntilExpiry < 0) status = 'Expired';
@@ -86,7 +86,6 @@ export function ExpiryReportPage() {
         status,
       };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawBatches]);
 
   const expiredRows = useMemo(() => allRows.filter((r) => r.daysUntilExpiry < 0), [allRows]);
@@ -179,7 +178,7 @@ export function ExpiryReportPage() {
         title="Expiry Report"
         subtitle="Track expired and near-expiry medicine batches"
         breadcrumbs={[
-          { label: 'Reports', path: ROUTES.REPORTS_EXPIRY },
+          { label: 'Reports', path: ROUTES.REPORTS },
           { label: 'Expiry Report' },
         ]}
       />

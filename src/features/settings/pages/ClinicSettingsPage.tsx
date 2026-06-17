@@ -1,20 +1,44 @@
-// #must: Clinic settings page — General (info form) and Appearance (logo, dark mode) tabs
+
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, Card, Alert } from '@/components/ui';
+import { FormField } from '@/components/forms/FormField';
+import { Button } from '@/components/ui/Button';
 import { FileUpload } from '@/components/forms/FileUpload';
 import { ClinicInfoForm } from '../components/ClinicInfoForm';
 import type { ClinicInfoFormValues } from '../components/ClinicInfoForm';
 import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
+import { useClinicStore } from '@/store/clinicStore';
 import { toast } from 'sonner';
 import { Moon, Sun, ImageIcon } from 'lucide-react';
 import type { TabItem } from '@/components/ui';
 
 const TABS: TabItem[] = [
+  { id: 'profile', label: 'Profile' },
   { id: 'general', label: 'General' },
   { id: 'appearance', label: 'Appearance' },
 ];
+
+const profileSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email'),
+});
+
+const passwordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+}).refine((d) => d.newPassword === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+type ProfileFormValues = z.infer<typeof profileSchema>;
+type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 interface ClinicSettingsRow {
   id: string;
@@ -27,12 +51,61 @@ interface ClinicSettingsRow {
 }
 
 export function ClinicSettingsPage() {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
+
+  const user = useAuthStore((s) => s.user);
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
+  const setClinicName = useClinicStore((s) => s.setClinicName);
+  const setLogoUrl = useClinicStore((s) => s.setLogoUrl);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
+
+  const profileForm = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { name: user?.name ?? '', email: user?.email ?? '' },
+  });
+
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { newPassword: '', confirmPassword: '' },
+  });
+
+  const handleSaveProfile = async (values: ProfileFormValues) => {
+    if (!user) return;
+    setIsProfileSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ name: values.name, email: values.email })
+        .eq('id', user.id);
+      if (error) throw error;
+      await refreshProfile();
+      toast.success('Profile updated successfully');
+    } catch (err) {
+      toast.error('Failed to update profile: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
+
+  const handleResetPassword = async (values: PasswordFormValues) => {
+    setIsPasswordSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: values.newPassword });
+      if (error) throw error;
+      toast.success('Password updated successfully');
+      passwordForm.reset();
+    } catch (err) {
+      toast.error('Failed to update password: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsPasswordSaving(false);
+    }
+  };
   const [isLogoUploading, setIsLogoUploading] = useState(false);
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [defaultValues, setDefaultValues] = useState<Partial<ClinicInfoFormValues> | undefined>();
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrlState] = useState<string | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   const { isDarkMode, toggleDarkMode } = useThemeStore();
@@ -51,7 +124,7 @@ export function ClinicSettingsPage() {
         toast.error('Failed to load clinic settings');
       } else if (data) {
         setSettingsId(data.id);
-        setLogoUrl(data.logo_url);
+        setLogoUrlState(data.logo_url);
         setDefaultValues({
           clinicName: data.clinic_name,
           email: data.email,
@@ -97,6 +170,7 @@ export function ClinicSettingsPage() {
       if (error) {
         toast.error('Failed to save settings: ' + error.message);
       } else {
+        setClinicName(values.clinicName);
         toast.success('Clinic settings saved successfully');
       }
     } finally {
@@ -114,7 +188,7 @@ export function ClinicSettingsPage() {
       const path = `clinic-logo/logo.${ext}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('assets')
+        .from('clinic-logos')
         .upload(path, file, { upsert: true });
 
       if (uploadError) {
@@ -122,7 +196,7 @@ export function ClinicSettingsPage() {
         return;
       }
 
-      const { data: urlData } = supabase.storage.from('assets').getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from('clinic-logos').getPublicUrl(path);
       const publicUrl = urlData.publicUrl;
 
       if (settingsId) {
@@ -145,7 +219,9 @@ export function ClinicSettingsPage() {
         }
       }
 
-      setLogoUrl(publicUrl);
+      const freshUrl = publicUrl + '?t=' + Date.now();
+      setLogoUrl(freshUrl);
+      setLogoUrlState(freshUrl);
       toast.success('Logo updated successfully');
     } finally {
       setIsLogoUploading(false);
@@ -162,6 +238,63 @@ export function ClinicSettingsPage() {
       <Tabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
       <div className="mt-6">
+        {activeTab === 'profile' && (
+          <div className="space-y-6">
+            {/* Profile info */}
+            <Card title="Profile Information" subtitle="Update your display name and email address">
+              <form onSubmit={profileForm.handleSubmit(handleSaveProfile)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={profileForm.control}
+                    name="name"
+                    label="Full Name"
+                    placeholder="Your full name"
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="email"
+                    type="email"
+                    label="Email"
+                    placeholder="your@email.com"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit" variant="primary" size="sm" isLoading={isProfileSaving}>
+                    Save Profile
+                  </Button>
+                </div>
+              </form>
+            </Card>
+
+            {/* Reset password */}
+            <Card title="Reset Password" subtitle="Choose a new password for your account">
+              <form onSubmit={passwordForm.handleSubmit(handleResetPassword)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={passwordForm.control}
+                    name="newPassword"
+                    type="password"
+                    label="New Password"
+                    placeholder="Min. 8 characters"
+                  />
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmPassword"
+                    type="password"
+                    label="Confirm Password"
+                    placeholder="Re-enter new password"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit" variant="primary" size="sm" isLoading={isPasswordSaving}>
+                    Update Password
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
+
         {activeTab === 'general' && (
           <Card title="General Information" subtitle="Update your clinic's contact and billing details">
             {isLoadingSettings ? (

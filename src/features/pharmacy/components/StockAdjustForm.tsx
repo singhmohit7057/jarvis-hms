@@ -1,4 +1,4 @@
-// #must: Modal form for adjusting stock of a batch (add or reduce stock manually)
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

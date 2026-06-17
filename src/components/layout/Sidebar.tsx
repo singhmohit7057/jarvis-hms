@@ -1,4 +1,4 @@
-// #must: Materio-style vertical sidebar with grouped navigation, collapsible state, dark mode
+
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Stethoscope } from 'lucide-react';
@@ -6,6 +6,7 @@ import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NAVIGATION, type NavGroup } from '@/config/navigation';
 import { SidebarNavItem } from './SidebarNavItem';
+import { useClinicStore } from '@/store/clinicStore';
 
 export interface SidebarProps {
   /** Whether sidebar is collapsed (icon-only) */
@@ -24,6 +25,8 @@ function getIconComponent(iconName: string): LucideIcon {
 
 export function Sidebar({ isCollapsed, userRole }: SidebarProps) {
   const location = useLocation();
+  const clinicName = useClinicStore((s) => s.clinicName);
+  const logoUrl = useClinicStore((s) => s.logoUrl);
 
   // Filter navigation based on user role
   const filteredNavigation: NavGroup[] = NAVIGATION.map((group) => ({
@@ -41,10 +44,14 @@ export function Sidebar({ isCollapsed, userRole }: SidebarProps) {
     >
       {/* Logo */}
       <div className={cn('flex items-center h-16 px-4 border-b border-gray-100 dark:border-slate-700 shrink-0', isCollapsed && 'justify-center')}>
-        <Stethoscope className="h-7 w-7 text-blue-600 dark:text-blue-400 shrink-0" />
+        {logoUrl ? (
+          <img src={logoUrl} alt="Clinic logo" className="h-8 w-8 object-contain shrink-0 rounded" />
+        ) : (
+          <Stethoscope className="h-7 w-7 text-blue-600 dark:text-blue-400 shrink-0" />
+        )}
         {!isCollapsed && (
           <span className="ml-2.5 text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
-            Jarvis
+            {clinicName.slice(0, 12)}
           </span>
         )}
       </div>

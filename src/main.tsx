@@ -1,4 +1,4 @@
-// #must: Application entry point — mounts React app with StrictMode
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/styles/globals.css';

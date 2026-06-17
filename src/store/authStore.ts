@@ -1,4 +1,4 @@
-// #must: Zustand store for authentication state — session management, login, logout, password reset
+
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/types';
@@ -12,6 +12,7 @@ interface AuthStore {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 async function fetchProfile(userId: string): Promise<User | null> {
@@ -124,6 +125,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     if (error) {
       throw new Error(error.message);
+    }
+  },
+
+  refreshProfile: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const profile = await fetchProfile(session.user.id);
+      if (profile) set({ user: profile });
     }
   },
 }));

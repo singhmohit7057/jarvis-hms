@@ -1,5 +1,3 @@
-// #must: Lab staff dashboard — booking stats, status pie chart, pending bookings table with next-action button
-
 import { useMemo } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import {

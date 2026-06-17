@@ -1,5 +1,6 @@
 /* #must: Global styles and CSS custom properties for theming */
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
@@ -54,6 +55,9 @@
 }
 .react-datepicker__input-container input {
   @apply w-full;
+}
+.react-datepicker-popper {
+  z-index: 9999 !important;
 }
 
 /* Transition utilities */

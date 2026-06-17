@@ -1,4 +1,4 @@
-// #must: Left-side medicine search panel for POS with debounced search and batch cards
+
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Package, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -53,7 +53,10 @@ export function POSProductSearch() {
           composition: item.composition ?? '',
           hsnCode: item.hsn_code,
           gstPercentage: item.gst_percentage,
-          unit: item.unit ?? 'Strip',
+          packSize: item.pack_size ?? 1,
+          looseSell: item.loose_sell ?? false,
+          reorderLevel: item.reorder_level ?? 0,
+          rackLocation: item.rack_location ?? '',
           isActive: item.is_active,
           createdAt: item.created_at,
           batches: (item.batches ?? [])
@@ -150,7 +153,7 @@ export function POSProductSearch() {
                     {medicine.company} {medicine.genericName ? `| ${medicine.genericName}` : ''}
                   </p>
                 </div>
-                <Badge variant="info">{medicine.gstPercentage}% GST</Badge>
+                <Badge variant="info">{medicine.category}</Badge>
               </div>
 
               {/* Batches */}
@@ -173,14 +176,42 @@ export function POSProductSearch() {
                         <span className="text-gray-500 dark:text-gray-400">
                           Exp: {formatDate(batch.expiryDate)}
                         </span>
-                        <Badge variant={batch.quantityInStock <= 10 ? 'warning' : 'success'} size="sm">
-                          Stock: {batch.quantityInStock}
-                        </Badge>
+                        {(() => {
+                          const ML_CATS = new Set(['Syrup', 'Drops', 'Injection', 'Inhaler']);
+                          const isLiquid = ML_CATS.has(medicine.category);
+                          const ps = Math.max(medicine.packSize, 1);
+                          const qty = batch.quantityInStock;
+
+                          if (medicine.looseSell) {
+                            // stock in pieces
+                            const containers = Math.floor(qty / ps);
+                            const label = ps > 1 ? `${containers} strips (${qty} pcs)` : `${qty} pcs`;
+                            return <Badge variant={qty <= ps * 3 ? 'warning' : 'success'} size="sm">{label}</Badge>;
+                          } else {
+                            // stock in whole units
+                            const unit = isLiquid ? 'bottles' : ps > 1 ? 'strips' : 'units';
+                            const detail = ps > 1 ? ` (${qty * ps} ${isLiquid ? 'ml' : 'pcs'})` : '';
+                            return <Badge variant={qty <= 5 ? 'warning' : 'success'} size="sm">{qty} {unit}{detail}</Badge>;
+                          }
+                        })()}
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                          {formatCurrency(batch.sellingPrice)}
-                        </span>
+                        <div className="text-right">
+                          {medicine.looseSell && medicine.packSize > 1 ? (
+                            <>
+                              <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                                {formatCurrency(Math.round(batch.mrp / medicine.packSize * 100) / 100)}/pc
+                              </span>
+                              <p className="text-xs text-gray-400">
+                                MRP {formatCurrency(batch.mrp)}/strip of {medicine.packSize}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                              {formatCurrency(batch.mrp)}/unit
+                            </span>
+                          )}
+                        </div>
                         <Button
                           variant="primary"
                           size="sm"

@@ -1,5 +1,5 @@
-// #must: Payment completion modal with method selection, change calc, and sale finalization
-import { useState } from 'react';
+
+import { useState, useMemo } from 'react';
 import { CreditCard, Banknote, Smartphone, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
@@ -9,7 +9,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useCart } from '../hooks/useCart';
-import { generateInvoicePDF } from '@/lib/pdf/invoice.pdf';
+import { generateInvoicePDF, fetchClinicSettings } from '@/lib/pdf/invoice.pdf';
 import type { Sale, SaleItem } from '@/types';
 
 interface POSPaymentModalProps {
@@ -36,11 +36,28 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
   const setPaidAmount = useCart((s) => s.setPaidAmount);
   const clearCart = useCart((s) => s.clearCart);
 
-  const grandTotal = useCart((s) => s.getGrandTotal());
-  const subtotal = useCart((s) => s.getSubtotal());
-  const gstTotal = useCart((s) => s.getGSTTotal());
-  const discountAmount = useCart((s) => s.getDiscountAmount());
-  const changeAmount = useCart((s) => s.getChangeAmount());
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+    [items]
+  );
+  const gstTotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.gstAmount, 0),
+    [items]
+  );
+  const discountAmount = useMemo(() => {
+    if (discount.type === 'percentage') {
+      return Math.round(subtotal * discount.value / 100 * 100) / 100;
+    }
+    return Math.min(discount.value, subtotal + gstTotal);
+  }, [subtotal, gstTotal, discount]);
+  const grandTotal = useMemo(
+    () => Math.round(subtotal - discountAmount),
+    [subtotal, discountAmount]
+  );
+  const changeAmount = useMemo(
+    () => paidAmount > grandTotal ? Math.round((paidAmount - grandTotal) * 100) / 100 : 0,
+    [paidAmount, grandTotal]
+  );
 
   const handleCompleteSale = async () => {
     if (paymentMethod === 'cash' && paidAmount < grandTotal) {
@@ -59,6 +76,7 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
         patient_id: customer?.patientId ?? null,
         customer_name: customer?.name || 'Walk-in Customer',
         customer_phone: customer?.phone || '',
+        doctor_name: customer?.doctorName || '',
         subtotal,
         discount_type: discount.type,
         discount_value: discount.value,
@@ -79,6 +97,7 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
         medicine_name: item.medicineName,
         hsn_code: item.hsnCode,
         batch_number: item.batchNumber,
+        expiry_date: item.expiryDate,
         quantity: item.quantity,
         unit_price: item.unitPrice,
         gst_percentage: item.gstPercentage,
@@ -111,6 +130,7 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
         patientId: customer?.patientId,
         customerName: customer?.name || 'Walk-in Customer',
         customerPhone: customer?.phone || '',
+        doctorName: customer?.doctorName || '',
         items: items.map((item) => ({
           id: '',
           saleId: saleData.id,
@@ -119,6 +139,7 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
           medicineName: item.medicineName,
           hsnCode: item.hsnCode,
           batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           gstPercentage: item.gstPercentage,
@@ -139,7 +160,8 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
       };
 
       try {
-        const pdf = generateInvoicePDF(sale);
+        const clinic = await fetchClinicSettings();
+        const pdf = generateInvoicePDF(sale, clinic);
         pdf.save(`${invoiceNumber}.pdf`);
       } catch {
         // PDF generation is non-critical
@@ -151,7 +173,10 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
       onClose();
       toast.success(`Sale completed! Invoice: ${invoiceNumber}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to complete sale';
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? 'Failed to complete sale';
       toast.error(message);
     } finally {
       setIsProcessing(false);
@@ -159,22 +184,22 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Complete Payment" size="lg">
-      <div className="space-y-6">
+    <Modal isOpen={isOpen} onClose={onClose} title="Complete Payment" size="md">
+      <div className="space-y-3">
         {/* Grand Total Display */}
-        <div className="text-center py-4 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-          <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Amount to Pay</p>
-          <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+        <div className="text-center py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+          <p className="text-xs text-blue-600 dark:text-blue-400">Amount to Pay</p>
+          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
             {formatCurrency(grandTotal)}
           </p>
         </div>
 
         {/* Payment Method Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
             Payment Method
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {paymentMethods.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -183,28 +208,14 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
                   if (id !== 'cash') setPaidAmount(grandTotal);
                 }}
                 className={cn(
-                  'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
+                  'flex items-center justify-center gap-2 py-2 px-3 rounded-lg border-2 transition-all',
                   paymentMethod === id
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                     : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'h-6 w-6',
-                    paymentMethod === id
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-gray-500 dark:text-gray-400'
-                  )}
-                />
-                <span
-                  className={cn(
-                    'text-sm font-medium',
-                    paymentMethod === id
-                      ? 'text-blue-700 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300'
-                  )}
-                >
+                <Icon className={cn('h-4 w-4', paymentMethod === id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400')} />
+                <span className={cn('text-sm font-medium', paymentMethod === id ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300')}>
                   {label}
                 </span>
               </button>
@@ -214,8 +225,8 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
 
         {/* Cash Amount Input */}
         {paymentMethod === 'cash' && (
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
               Amount Received
             </label>
             <input
@@ -225,12 +236,12 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
               value={paidAmount || ''}
               onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
               placeholder="Enter amount received"
-              className="w-full px-4 py-3 text-lg rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
             {paidAmount >= grandTotal && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+              <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20">
                 <span className="text-sm text-green-700 dark:text-green-300">Change to Return</span>
-                <span className="text-lg font-bold text-green-700 dark:text-green-300">
+                <span className="text-base font-bold text-green-700 dark:text-green-300">
                   {formatCurrency(changeAmount)}
                 </span>
               </div>
@@ -241,12 +252,12 @@ export function POSPaymentModal({ isOpen, onClose }: POSPaymentModalProps) {
         {/* Complete Button */}
         <Button
           variant="success"
-          size="lg"
+          size="md"
           fullWidth
           isLoading={isProcessing}
           disabled={paymentMethod === 'cash' && paidAmount < grandTotal}
           onClick={handleCompleteSale}
-          leftIcon={<CheckCircle className="h-5 w-5" />}
+          leftIcon={<CheckCircle className="h-4 w-4" />}
         >
           Complete Sale
         </Button>

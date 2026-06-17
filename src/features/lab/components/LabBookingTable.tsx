@@ -1,4 +1,4 @@
-// #must: DataTable column definitions and rendering for lab bookings list
+
 import { useMemo } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/data/DataTable';
@@ -14,6 +14,7 @@ interface LabBookingTableProps {
   onUpdateStatus: (booking: LabBooking) => void;
   onViewDetails: (booking: LabBooking) => void;
   onEnterReport: (booking: LabBooking) => void;
+  onPrintReport: (booking: LabBooking) => void;
   onPrintReceipt: (booking: LabBooking) => void;
   getNextStatus: (current: LabStatus) => LabStatus | null;
 }
@@ -21,7 +22,7 @@ interface LabBookingTableProps {
 const NEXT_STATUS_LABELS: Record<LabStatus, string> = {
   booked: 'Collect Sample',
   sample_collected: 'Start Processing',
-  processing: 'Mark Complete',
+  processing: 'Make Report',
   completed: 'Mark Delivered',
   delivered: '',
 };
@@ -32,6 +33,7 @@ export function LabBookingTable({
   onUpdateStatus,
   onViewDetails,
   onEnterReport,
+  onPrintReport,
   onPrintReceipt,
   getNextStatus,
 }: LabBookingTableProps) {
@@ -115,11 +117,12 @@ export function LabBookingTable({
         cell: ({ row }) => {
           const booking = row.original;
           const nextStatus = getNextStatus(booking.status);
-          const canEnterReport =
-            booking.status === 'processing' || booking.status === 'completed';
+
+          const canEditReport = booking.status === 'completed';
+          const canViewReport = booking.status === 'completed' || booking.status === 'delivered';
 
           return (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 whitespace-nowrap">
               {nextStatus && (
                 <Button
                   variant="primary"
@@ -127,53 +130,54 @@ export function LabBookingTable({
                   rightIcon={<ArrowRight className="h-3 w-3" />}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onUpdateStatus(booking);
+                    if (booking.status === 'processing') {
+                      onEnterReport(booking);
+                    } else {
+                      onUpdateStatus(booking);
+                    }
                   }}
                 >
                   {NEXT_STATUS_LABELS[booking.status]}
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewDetails(booking);
-                }}
-                title="View Details"
+              <button
+                onClick={(e) => { e.stopPropagation(); onViewDetails(booking); }}
+                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-700 dark:hover:text-blue-400 transition-colors"
               >
                 <Eye className="h-3.5 w-3.5" />
-              </Button>
-              {canEnterReport && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEnterReport(booking);
-                  }}
-                  title="Enter Report"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPrintReceipt(booking);
-                }}
-                title="Print Receipt"
+                <span className="text-[10px] font-medium">View</span>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onPrintReceipt(booking); }}
+                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-700 dark:hover:text-blue-400 transition-colors"
               >
                 <Printer className="h-3.5 w-3.5" />
-              </Button>
+                <span className="text-[10px] font-medium">Receipt</span>
+              </button>
+              {canViewReport && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPrintReport(booking); }}
+                  className="flex flex-col items-center gap-0.5 px-2 py-1 rounded text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-700 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-medium">Report</span>
+                </button>
+              )}
+              {canEditReport && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEnterReport(booking); }}
+                  className="flex flex-col items-center gap-0.5 px-2 py-1 rounded text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-700 dark:hover:text-blue-400 transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-medium">Edit</span>
+                </button>
+              )}
             </div>
           );
         },
       },
     ],
-    [onUpdateStatus, onViewDetails, onEnterReport, onPrintReceipt, getNextStatus]
+    [onUpdateStatus, onViewDetails, onEnterReport, onPrintReport, onPrintReceipt, getNextStatus]
   );
 
   return (

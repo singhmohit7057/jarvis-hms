@@ -1,4 +1,4 @@
-// #must: Doctor management page — CRUD for clinic doctors
+
 import { useState, useMemo, useCallback } from 'react';
 import { Stethoscope, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,6 +14,19 @@ import { useActivityLog } from '@/hooks/useActivityLog';
 import { DoctorForm } from '../components/DoctorForm';
 import type { Doctor } from '@/types';
 import type { DoctorSchemaType } from '../schemas/doctor.schema';
+
+function normalizeTime(t?: string | null): string {
+  if (!t) return '';
+  if (/^\d{2}:\d{2}$/.test(t)) return t;
+  const m = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return t;
+  let h = parseInt(m[1]);
+  const min = m[2];
+  const period = m[3].toUpperCase();
+  if (period === 'AM' && h === 12) h = 0;
+  if (period === 'PM' && h !== 12) h += 12;
+  return `${String(h).padStart(2, '0')}:${min}`;
+}
 
 interface DoctorRow {
   id: string;
@@ -293,8 +306,8 @@ export function DoctorManagementPage() {
       email: editingDoctor.email ?? '',
       consultation_fee: editingDoctor.consultationFee,
       available_days: editingDoctor.availableDays,
-      available_time_start: editingDoctor.availableTimeStart ?? '',
-      available_time_end: editingDoctor.availableTimeEnd ?? '',
+      available_time_start: normalizeTime(editingDoctor.availableTimeStart),
+      available_time_end: normalizeTime(editingDoctor.availableTimeEnd),
       is_active: editingDoctor.isActive,
     };
   }, [editingDoctor]);

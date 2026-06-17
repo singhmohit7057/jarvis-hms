@@ -1,4 +1,4 @@
-// #must: Zod validation schema for patient registration and edit forms
+
 import { z } from 'zod';
 import { GENDER_OPTIONS } from '@/config/constants';
 
@@ -12,7 +12,7 @@ export const patientSchema = z.object({
   age: z.coerce
     .number()
     .int('Age must be a whole number')
-    .min(0, 'Age cannot be negative')
+    .min(1, 'Age must be at least 1')
     .max(150, 'Age must be 150 or less'),
   gender: z.enum(GENDER_OPTIONS),
   phone: z

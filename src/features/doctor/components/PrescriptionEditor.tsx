@@ -1,4 +1,4 @@
-// #must: Dynamic prescription items editor using react-hook-form useFieldArray
+
 import { useFieldArray, type Control, type FieldErrors } from 'react-hook-form';
 import { Button } from '@/components/ui/Button';
 import { Plus } from 'lucide-react';

@@ -1,6 +1,4 @@
-// #must: Lab revenue report — bookings, test revenue, category distribution, test-level breakdown
-
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   DollarSign,
@@ -62,7 +60,7 @@ export function LabRevenuePage() {
   });
 
   const { data: rawBookings, isLoading } = useSupabaseQuery<RawBooking>(
-    useCallback(async () => {
+    async () => {
       const start = toDateStr(filters.startDate);
       const end = toDateStr(filters.endDate);
 
@@ -76,7 +74,8 @@ export function LabRevenuePage() {
         .order('created_at', { ascending: true });
 
       return { data: (data ?? []) as unknown as RawBooking[], error };
-    }, [filters])
+    },
+    [filters]
   );
 
   // Aggregate daily rows
@@ -248,7 +247,7 @@ export function LabRevenuePage() {
         title="Lab Revenue Report"
         subtitle="Lab booking revenue, test performance, and daily breakdown"
         breadcrumbs={[
-          { label: 'Reports', path: ROUTES.REPORTS_LAB },
+          { label: 'Reports', path: ROUTES.REPORTS },
           { label: 'Lab Revenue' },
         ]}
       />

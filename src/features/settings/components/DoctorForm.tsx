@@ -1,9 +1,10 @@
-// #must: Doctor add/edit form — react-hook-form + zod
+
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/forms/FormField';
+import type { SelectOption } from '@/components/ui/Select';
 import { PhoneInput } from '@/components/forms/PhoneInput';
 import {
   doctorSchema,
@@ -60,7 +61,7 @@ export function DoctorForm({ onSubmit, defaultValues, isLoading = false, onClose
             name="specialization"
             label="Specialization"
             type="select"
-            options={SPECIALIZATION_OPTIONS}
+            options={SPECIALIZATION_OPTIONS as unknown as SelectOption[]}
             placeholder="Select specialization"
           />
           <FormField

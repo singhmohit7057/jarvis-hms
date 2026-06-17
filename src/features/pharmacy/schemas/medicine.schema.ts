@@ -1,4 +1,4 @@
-// #must: Zod validation schemas for medicine and medicine batch forms
+
 import { z } from 'zod';
 import { MEDICINE_CATEGORIES, GST_SLABS } from '@/config/constants';
 
@@ -10,13 +10,15 @@ export const medicineSchema = z.object({
     errorMap: () => ({ message: 'Please select a valid category' }),
   }),
   composition: z.string().max(500).default(''),
-  hsnCode: z.string().min(1, 'HSN code is required').max(20),
-  gstPercentage: z.coerce
-    .number()
-    .refine((val): val is (typeof GST_SLABS)[number] => GST_SLABS.includes(val as (typeof GST_SLABS)[number]), {
-      message: 'Please select a valid GST slab',
-    }),
-  unit: z.string().min(1).max(50).default('Strip'),
+  packSize: z.coerce.number().int().min(1, 'Pack size must be at least 1').default(1),
+  looseSell: z.boolean().default(false),
+  hsnCode: z.string().max(20).default(''),
+  gstPercentage: z.coerce.number().refine(
+    (v) => (GST_SLABS as readonly number[]).includes(v),
+    { message: 'Select a valid GST slab' }
+  ).default(0),
+  reorderLevel: z.coerce.number().int('Must be a whole number').min(0, 'Cannot be negative').default(0),
+  rackLocation: z.string().max(50).default(''),
 });
 
 export type MedicineFormData = z.infer<typeof medicineSchema>;
@@ -33,9 +35,8 @@ export const medicineBatchSchema = z.object({
     { message: 'Expiry date must be in the future' }
   ),
   mrp: z.coerce.number().positive('MRP must be greater than 0'),
-  purchasePrice: z.coerce.number().positive('Purchase price must be greater than 0'),
-  sellingPrice: z.coerce.number().positive('Selling price must be greater than 0'),
-  quantityInStock: z.coerce.number().int('Quantity must be a whole number').min(0, 'Quantity cannot be negative'),
+  purchasePrice: z.coerce.number().min(0).optional().default(0),
+  quantityInStock: z.coerce.number().int('Quantity must be a whole number').min(1, 'Quantity must be at least 1'),
 });
 
 export type MedicineBatchFormData = z.infer<typeof medicineBatchSchema>;

@@ -1,5 +1,3 @@
-// #must: Reusable revenue area chart with gradient fill, INR formatting, and responsive container
-
 import {
   AreaChart,
   Area,

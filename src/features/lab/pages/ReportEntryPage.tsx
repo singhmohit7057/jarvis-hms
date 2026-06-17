@@ -1,4 +1,4 @@
-// #must: Lab report entry page — enter results for each test in a booking
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -14,8 +14,12 @@ import { ROUTES } from '@/config/routes';
 import { formatDate } from '@/lib/formatters';
 import { LabStatusTracker } from '../components/LabStatusTracker';
 import { ReportEntryForm } from '../components/ReportEntryForm';
+import { MarkCompleteModal } from '../components/MarkCompleteModal';
 import { generateLabReportPDF } from '@/lib/pdf/lab-report.pdf';
 import type { LabBooking, LabTest, LabReport, LabResultEntry } from '@/types';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const safeUUID = (id?: string | null) => (id && UUID_RE.test(id) ? id : null);
 
 interface TestWithReport {
   test: LabTest;
@@ -41,6 +45,7 @@ export function ReportEntryPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [drafts, setDrafts] = useState<Map<string, DraftResult>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   // Fetch booking details + tests + existing reports
   const fetchData = useCallback(async () => {
@@ -80,8 +85,11 @@ export function ReportEntryPage() {
         paymentMethod: bookingData.payment_method ?? undefined,
         status: bookingData.status,
         collectedBy: bookingData.collected_by ?? undefined,
+        collectorName: bookingData.collector_name ?? undefined,
+        bottleNumber: bookingData.bottle_number ?? undefined,
         processedBy: bookingData.processed_by ?? undefined,
         verifiedBy: bookingData.verified_by ?? undefined,
+        preparedBy: bookingData.prepared_by ?? undefined,
         createdAt: bookingData.created_at,
       };
 
@@ -169,7 +177,7 @@ export function ReportEntryPage() {
     fetchData();
   }, [fetchData]);
 
-  // Handle save for a single test
+  // Auto-sync draft on every keystroke
   const handleSaveTest = useCallback(
     (testId: string, data: { results: LabResultEntry[]; interpretation: string }) => {
       setDrafts((prev) => {
@@ -177,9 +185,33 @@ export function ReportEntryPage() {
         next.set(testId, { testId, results: data.results, interpretation: data.interpretation });
         return next;
       });
-      toast.success('Results saved to draft');
     },
     []
+  );
+
+  const extractMessage = (err: unknown) =>
+    (err as { message?: string })?.message ?? 'Unknown error';
+
+  const upsertReport = useCallback(
+    async (testId: string, draft: DraftResult) => {
+      const testInfo = testsWithReports.find((t) => t.test.id === testId);
+      const reportNumber = `RPT-${booking!.bookingNumber}-${testId.slice(-4).toUpperCase()}`;
+      const payload = {
+        report_number: reportNumber,
+        lab_booking_id: booking!.id,
+        lab_test_id: testId,
+        test_name: testInfo?.bookingTestName ?? '',
+        patient_id: booking!.patientId,
+        results: draft.results,
+        interpretation: draft.interpretation || null,
+        verified_by: safeUUID(user?.id),
+      };
+      const { error } = await supabase
+        .from('lab_reports')
+        .upsert(payload, { onConflict: 'report_number' });
+      if (error) throw error;
+    },
+    [booking, testsWithReports, user]
   );
 
   // Save all drafts (without completing)
@@ -188,53 +220,25 @@ export function ReportEntryPage() {
       toast.info('No changes to save');
       return;
     }
-
     setIsSaving(true);
     try {
       for (const [testId, draft] of drafts) {
-        // Upsert report
-        const existing = testsWithReports.find((t) => t.test.id === testId)?.report;
-        const testInfo = testsWithReports.find((t) => t.test.id === testId);
-
-        const reportNumber = `RPT-${booking.bookingNumber}-${testId.slice(-4).toUpperCase()}`;
-        const payload = {
-          lab_booking_id: booking.id,
-          lab_test_id: testId,
-          test_name: testInfo?.bookingTestName ?? '',
-          patient_id: booking.patientId,
-          results: draft.results,
-          interpretation: draft.interpretation || null,
-          verified_by: user?.name ?? 'Lab Staff',
-        };
-
-        if (existing) {
-          const { error } = await supabase
-            .from('lab_reports')
-            .update(payload)
-            .eq('id', existing.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('lab_reports').insert({ ...payload, report_number: reportNumber });
-          if (error) throw error;
-        }
+        await upsertReport(testId, draft);
       }
-
       toast.success('Draft saved successfully');
       setDrafts(new Map());
       fetchData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save draft');
+      toast.error(extractMessage(err));
     } finally {
       setIsSaving(false);
     }
-  }, [booking, drafts, testsWithReports, user, fetchData]);
+  }, [booking, drafts, upsertReport, fetchData]);
 
-  // Mark complete — validates all values, updates status
-  const handleMarkComplete = useCallback(async () => {
+  // Validate then open the "prepared by" modal
+  const handleMarkCompleteClick = useCallback(() => {
     if (!booking) return;
 
-    // Validate: all tests must have all parameters filled
-    // Check both drafts and existing reports
     for (const tw of testsWithReports) {
       const draft = drafts.get(tw.test.id);
       const results = draft?.results ?? tw.report?.results ?? [];
@@ -243,12 +247,9 @@ export function ReportEntryPage() {
         toast.error(`Please enter results for "${tw.bookingTestName}"`);
         return;
       }
-
       const emptyResults = results.filter((r) => r.value.trim() === '');
       if (emptyResults.length > 0) {
-        toast.error(
-          `All parameters must have values in "${tw.bookingTestName}"`
-        );
+        toast.error(`All parameters must have values in "${tw.bookingTestName}"`);
         return;
       }
     }
@@ -258,62 +259,42 @@ export function ReportEntryPage() {
       return;
     }
 
+    setShowCompleteModal(true);
+  }, [booking, drafts, testsWithReports]);
+
+  // Mark complete — saves drafts, sets status completed
+  const handleMarkComplete = useCallback(async (preparedBy: string) => {
+    if (!booking) return;
+    setShowCompleteModal(false);
     setIsSaving(true);
     try {
-      // Save any unsaved drafts first
       for (const [testId, draft] of drafts) {
-        const existing = testsWithReports.find((t) => t.test.id === testId)?.report;
-        const testInfo = testsWithReports.find((t) => t.test.id === testId);
-
-        const reportNumber = `RPT-${booking.bookingNumber}-${testId.slice(-4).toUpperCase()}`;
-        const payload = {
-          lab_booking_id: booking.id,
-          lab_test_id: testId,
-          test_name: testInfo?.bookingTestName ?? '',
-          patient_id: booking.patientId,
-          results: draft.results,
-          interpretation: draft.interpretation || null,
-          verified_by: user?.name ?? 'Lab Staff',
-        };
-
-        if (existing) {
-          const { error } = await supabase
-            .from('lab_reports')
-            .update(payload)
-            .eq('id', existing.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('lab_reports').insert({ ...payload, report_number: reportNumber });
-          if (error) throw error;
-        }
+        await upsertReport(testId, draft);
       }
 
-      // Update booking status to completed
       const { error: statusError } = await supabase
         .from('lab_bookings')
-        .update({ status: 'completed', verified_by: user?.id })
+        .update({ status: 'completed', verified_by: safeUUID(user?.id), prepared_by: preparedBy })
         .eq('id', booking.id);
-
       if (statusError) throw statusError;
 
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        user_id: user?.id,
+      supabase.from('activity_logs').insert({
+        user_id: safeUUID(user?.id),
         user_name: user?.name ?? 'Unknown',
         action: 'lab_report_completed',
         description: `Lab report completed for booking ${booking.bookingNumber}`,
         metadata: { bookingId: booking.id },
-      });
+      }).then(({ error }) => { if (error) console.warn('Activity log failed:', error.message); });
 
       toast.success('Report marked as complete');
       setDrafts(new Map());
-      fetchData();
+      navigate(ROUTES.LAB_BOOKINGS);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to complete report');
+      toast.error(extractMessage(err));
     } finally {
       setIsSaving(false);
     }
-  }, [booking, drafts, testsWithReports, user, fetchData]);
+  }, [booking, drafts, upsertReport, user]);
 
   // Generate PDF
   const handleGeneratePDF = useCallback(async () => {
@@ -359,9 +340,14 @@ export function ReportEntryPage() {
         };
       });
 
+      if (!booking.patient) {
+        toast.error('Patient data not available');
+        return;
+      }
+
       const bookingWithPatient = {
         ...booking,
-        patient: booking.patient!,
+        patient: booking.patient,
       };
 
       const pdf = generateLabReportPDF(bookingWithPatient, mappedReports);
@@ -444,7 +430,7 @@ export function ReportEntryPage() {
           <div>
             <span className="text-gray-500 dark:text-gray-400">Sample Collected By</span>
             <p className="font-medium text-gray-900 dark:text-gray-100">
-              {booking.collectedBy ?? 'Pending'}
+              {booking.collectorName ?? booking.collectedBy ?? 'Pending'}
             </p>
           </div>
           <div>
@@ -501,13 +487,19 @@ export function ReportEntryPage() {
           <Button
             variant="success"
             leftIcon={<CheckCircle className="h-4 w-4" />}
-            onClick={handleMarkComplete}
+            onClick={handleMarkCompleteClick}
             isLoading={isSaving}
           >
             Mark Complete
           </Button>
         </div>
       </div>
+      <MarkCompleteModal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        onConfirm={handleMarkComplete}
+        isLoading={isSaving}
+      />
     </div>
   );
 }

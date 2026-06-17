@@ -1,4 +1,4 @@
-// #must: POS Billing screen with split layout — medicine search left, cart right
+
 import { PageHeader } from '@/components/layout/PageHeader';
 import { POSProductSearch } from '../components/POSProductSearch';
 import { POSCart } from '../components/POSCart';

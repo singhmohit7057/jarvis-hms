@@ -1,4 +1,4 @@
-// #must: Vitals input/display component for consultation — editable or read-only
+
 import { Controller, type Control } from 'react-hook-form';
 import { Input } from '@/components/ui/Input';
 import { Activity, Heart, Thermometer, Weight, Ruler, Wind } from 'lucide-react';

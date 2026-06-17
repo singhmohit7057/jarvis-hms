@@ -1,4 +1,4 @@
-// #must: Zustand store for dark mode state — persisted to localStorage, syncs with document class
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
